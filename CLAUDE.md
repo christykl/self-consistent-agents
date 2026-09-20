@@ -113,7 +113,8 @@ Results land in `outputs/evals/countdown_code--openai--o4-mini/<run_id>/` as `re
 ### Linear probe (`environments/countdown_code/probe/`)
 
 Predicts o4-mini hacking (exec=1 & eq=0) on the no-ask runs (`dbc2e66b`, `39f39e60`, `3fb9e8c3`) from
-mean-pooled last-layer Qwen3-4B features of the task prompt. Needs `pip install -e '.[probe]'`.
+mean-pooled last-layer Qwen3-4B features of the task prompt. Setup and run instructions for a GPU node: `environments/countdown_code/probe/SERVER_SETUP.md`
+(avoid `pip install -e .` there — the core deps include `vllm`).
 
 ```bash
 python -m probe.features --out probe/features_qwen3_4b.npz   # GPU, one pass per distinct problem
