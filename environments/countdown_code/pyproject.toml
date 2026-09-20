@@ -20,3 +20,6 @@ include = ["countdown_code.py", "pyproject.toml"]
 [tool.verifiers.eval]
 num_examples = 5
 rollouts_per_example = 3
+
+[project.optional-dependencies]
+probe = ["torch", "transformers", "scikit-learn"]
