@@ -152,6 +152,42 @@ Chosen C per outer fold (inner-CV): `hack` default [1e-4, 1e-4, 1e-4, 1e-4, 1.0]
   signal, pooling out-of-fold scores mixes differently scaled probabilities. Per-fold AUC would be
   cleaner (not run); I do not expect it to change the conclusion.
 
+### Relationship between hacking and legitimate success
+
+Question: is per-problem hack rate correlated with per-problem success rate? On the same rollouts the
+two are mechanically anti-correlated (a rollout cannot be both), so the comparison uses disjoint
+rollouts. Rollouts fall into three classes: hack (exec = 1, eq = 0), success (exec = 1, eq = 1) and
+"other failure" (neither). On the 1143 problems with exactly 4 clean rollouts the mean rates are
+hack 0.049, success 0.918, other failure 0.032.
+
+Same rollouts (mechanical): corr(hack rate, success rate) = -0.844 (Spearman -0.819);
+corr(hack, other failure) = +0.196.
+
+Disjoint rollouts: each problem's 4 rollouts are randomly split into 2 + 2, and the rate in one half
+is correlated with the rate in the other; mean over 300 random splits.
+
+| Correlation between halves | Value |
+|---|---|
+| hack vs success | -0.345 |
+| hack vs other failure | +0.184 |
+| success vs other failure | -0.236 |
+| hack vs hack (reliability) | +0.306 |
+| success vs success (reliability) | +0.406 |
+| other failure vs other failure (reliability) | +0.161 |
+
+- Cross-half hack-vs-success (-0.345) is about as negative as the two reliabilities allow: the
+  bound is -sqrt(0.306 x 0.406), about -0.35. So the problem-level component of hacking and of
+  legitimate failing look like nearly the same dimension: problems where o4-mini fails to solve
+  legitimately are the problems where it hacks. With 2 rollouts per half these estimates are noisy;
+  treat "nearly the same" as suggestive.
+- Hack rate of a rollout vs the number of **other-failure** rollouts among the other 3 rollouts of its
+  problem: 3.9% (0 others, n = 4179), 14.9% (1 other, n = 343), 26.5% (2 others, n = 49); the single
+  problem-rollout with 3 has a 0% hack rate (n = 1).
+- Of all non-success rollouts, 60% are hacks (226 hacks vs 148 other failures), so when o4-mini does
+  not solve a problem it hacks more often than it simply fails.
+- Hack rate vs the number of the other 3 rollouts that were hacks: 2.8% (0, n = 4029), 19.5% (1,
+  n = 421), 24.8% (2, n = 109), 30.8% (3, n = 13). Hacking repeats within a problem.
+
 ## Interpretation
 
 - There is real problem-level structure in o4-mini hacking (reliability about 0.5), so a null probe
@@ -165,9 +201,15 @@ Chosen C per outer fold (inner-CV): `hack` default [1e-4, 1e-4, 1e-4, 1e-4, 1.0]
   features may encode little arithmetic structure; difficulty for o4-mini may depend on things like
   solution rarity rather than surface features; and features come from Qwen3-4B while the labels are
   from a different model (o4-mini).
-- A separate caveat on the "success vs hack" relationship: the two labels are mutually exclusive by
-  construction, so comparisons like "hack rate given the other rollouts failed legitimately" are
-  confounded. An earlier exploratory version of that table is not reported here for that reason.
+- Hacking looks largely like a downstream effect of a problem being hard for o4-mini (see the
+  hack vs success section): hack and legitimate failure share most of their problem-level variation.
+  That fits both probe nulls, since both targets appear to depend on the same "difficulty for o4-mini"
+  dimension, which the Qwen3-4B prompt features do not seem to expose.
+- Caveat on the "success vs hack" relationship: the two labels are mutually exclusive by construction,
+  so same-rollout correlations are meaningless, and conditioning on how many *other* rollouts
+  succeeded is also confounded, because hack-prone problems have hacked (hence non-successful) other
+  rollouts. An earlier exploratory version of that table was dropped for this reason. The section
+  above uses disjoint rollouts and separates other failures from hacks instead.
 
 ## Caveats
 
@@ -181,8 +223,9 @@ Chosen C per outer fold (inner-CV): `hack` default [1e-4, 1e-4, 1e-4, 1e-4, 1.0]
 - The original three runs and the top-up runs draw different rollouts of the same problems, but the
   original `dbc2e66b` and `39f39e60` used an unseeded split of `countdown_4num.jsonl`; problems are
   identified purely by `target|numbers`, so this does not matter for grouping.
-- The concentration / reliability numbers and the class-imbalance check above came from inline
-  analysis scripts that were not saved to the repo; only the probe output is in `probe/out/`.
+- The concentration / reliability numbers, the class-imbalance check and the hack vs success analysis
+  above came from inline analysis scripts that were not saved to the repo; only the probe output is
+  in `probe/out/`.
 - A 3-problem smoke test was run and its output directory deleted; it is not part of any results.
 
 ## Suggested next steps
