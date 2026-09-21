@@ -1,0 +1,8 @@
+1800 rollouts on 1147 problems, 2560-dim features
+hack: 97 positives, base rate 0.054 | probe AUC 0.492, Brier 0.062 (base-rate Brier 0.051), accuracy 0.933 (majority 0.946)
+   shuffled-features control: AUC 0.471 +- 0.068 over 5 shuffles
+   per-problem correlation(probe, empirical rate) = 0.005
+success: 1653 positives, base rate 0.918 | probe AUC 0.417, Brier 0.088 (base-rate Brier 0.075), accuracy 0.906 (majority 0.918)
+   shuffled-features control: AUC 0.477 +- 0.054 over 5 shuffles
+   per-problem correlation(probe, empirical rate) = -0.043
+caveat: few hack positives -> wide AUC uncertainty; compare against the shuffled control

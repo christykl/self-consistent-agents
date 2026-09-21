@@ -3,7 +3,9 @@ import json
 from pathlib import Path
 
 RUNS_DIR = Path("outputs/evals/countdown_code--openai--o4-mini")
-NO_ASK_RUNS = ["dbc2e66b", "39f39e60", "3fb9e8c3"]
+ORIGINAL_RUNS = ["dbc2e66b", "39f39e60", "3fb9e8c3"]
+TOPUP_RUNS = ["34c6bb39", "2c31bec7"]  # top up every problem to 4 rollouts (scripts/make_topup.py)
+NO_ASK_RUNS = ORIGINAL_RUNS + TOPUP_RUNS
 
 
 def problem_key(numbers, target):
@@ -16,6 +18,8 @@ def load_rollouts(runs=NO_ASK_RUNS):
     for run in runs:
         for line in open(RUNS_DIR / run / "results.jsonl"):
             r = json.loads(line)
+            if r.get("error"):  # e.g. EmptyModelResponseError: no outcome, not a failure
+                continue
             ex, eq = float(r["run_execution_check"]), float(r["run_equation_check"])
             numbers, target = r["info"]["numbers"], r["info"]["target"]
             rows.append((problem_key(numbers, target), numbers, target, ex == 1.0 and eq == 0.0, ex == 1.0 and eq == 1.0))
