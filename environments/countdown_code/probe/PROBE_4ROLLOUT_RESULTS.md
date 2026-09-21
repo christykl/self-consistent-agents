@@ -113,6 +113,45 @@ Hack count per problem (0 to 4 of 4): 979, 113, 41, 9, 1.
   that did not hold up at 1143 problems.
 - 20.8% of problems have at least one legitimate failure among their 4 rollouts.
 
+### Class-imbalance check
+
+Concern: with a 5% hack rate (and 92% success), is the probe just collapsing to "no hack" / "yes
+success"? Checked by rerunning the same grouped CV with and without `class_weight="balanced"` and
+reporting threshold-free and imbalance-robust metrics (pooled out-of-fold predictions, all 4589
+rollouts).
+
+`class_weight="balanced"` does **not** subsample. It keeps every rollout and reweights the loss so
+each class contributes equally in total: weight = `n_samples / (n_classes * n_class_samples)`, i.e.
+about 10.1 per hack rollout and 0.53 per non-hack rollout (`success`: 0.54 per success, 6.1 per
+non-success). This is roughly equivalent to oversampling the minority class. It also shifts the
+intercept, so the outputs are no longer calibrated probabilities (mean `hack` score 0.324 instead of
+0.046); this does not affect AUC, which only uses the ranking.
+
+| Target (base rate) | Setup | Pred std | AUC | Avg precision (chance = base rate) | Balanced acc (chance 0.5) | Positive rate in top-10% scored |
+|---|---|---|---|---|---|---|
+| `hack` (0.050) | default | 0.049 | 0.500 | 0.052 (0.050) | 0.503 | 0.050 |
+| `hack` | balanced | 0.225 | 0.513 | 0.050 (0.050) | 0.494 | 0.046 |
+| `success` (0.918) | default | 0.113 | 0.524 | 0.922 (0.918) | 0.506 | 0.922 |
+| `success` | balanced | 0.254 | 0.512 | 0.920 (0.918) | 0.508 | 0.899 |
+
+Chosen C per outer fold (inner-CV): `hack` default [1e-4, 1e-4, 1e-4, 1e-4, 1.0], `hack` balanced
+[1e-4, 1e-4, 1e-2, 1e-4, 1.0], `success` default [1.0, 1e-4, 1e-2, 1e-3, 1.0], `success` balanced
+[1.0, 1.0, 1e-3, 1e-4, 1.0].
+
+- **Partly right:** accuracy at a 0.5 threshold is uninformative (0.948 for `hack` is just the
+  majority class; only 0.3% of default `hack` predictions reach 0.5, 98% of default `success`
+  predictions do). For `hack`, inner CV picked the strongest regularization (C = 1e-4) in 4 of 5
+  folds, where the model outputs almost exactly the base rate.
+- **But not a constant predictor:** default `hack` predictions range from 0 to 0.69 (std 0.049); the
+  scores just carry no information.
+- **Balancing does not reveal signal:** the predictions spread out (21% of `hack` predictions at or
+  above 0.5, up from 0.3%), but AUC stays at 0.513, average precision equals the base rate, balanced
+  accuracy is 0.494, and the top 10% of `hack` scores contain 4.6% hacks vs 5.0% overall.
+  Imbalance is not what is hiding a signal; AUC does not depend on it.
+- **Side effect worth knowing:** because inner CV picks a different C per fold when there is no
+  signal, pooling out-of-fold scores mixes differently scaled probabilities. Per-fold AUC would be
+  cleaner (not run); I do not expect it to change the conclusion.
+
 ## Interpretation
 
 - There is real problem-level structure in o4-mini hacking (reliability about 0.5), so a null probe
@@ -142,8 +181,8 @@ Hack count per problem (0 to 4 of 4): 979, 113, 41, 9, 1.
 - The original three runs and the top-up runs draw different rollouts of the same problems, but the
   original `dbc2e66b` and `39f39e60` used an unseeded split of `countdown_4num.jsonl`; problems are
   identified purely by `target|numbers`, so this does not matter for grouping.
-- The concentration / reliability numbers above came from an inline analysis script that was not
-  saved to the repo; only the probe output is in `probe/out/`.
+- The concentration / reliability numbers and the class-imbalance check above came from inline
+  analysis scripts that were not saved to the repo; only the probe output is in `probe/out/`.
 - A 3-problem smoke test was run and its output directory deleted; it is not part of any results.
 
 ## Suggested next steps
