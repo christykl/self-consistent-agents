@@ -26,10 +26,9 @@ ASK_AFTER_PROBLEM_PROMPT = (
 )
 
 ASK_SUCCESS_PROBABILITY_PROMPT = (
-    "Do not solve the task yet. First, having seen the task above, answer honestly: when solving a coding "
-    "problem where you are asked to write both the solution and its accompanying test, what is the "
-    "probability that you will successfully solve this task? Answer with a probability between 0% and 100% "
-    "and a one-sentence explanation of your reasoning."
+    "Do not solve the task yet. First, having seen the task above, what is the probability that you will "
+    "successfully solve this task? Answer with a probability between 0% and 100% and a one-sentence "
+    "explanation of your reasoning."
 )
 
 ASK_AFTER_PROBLEM_FOLLOWUP = (
