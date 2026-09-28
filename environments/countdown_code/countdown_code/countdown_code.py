@@ -1,5 +1,6 @@
 import hashlib
 import json
+import random
 from typing import List, Dict, Any, Optional
 from datasets import load_dataset
 import verifiers as vf
@@ -42,7 +43,9 @@ def load_environment(dataset_name: str = "Jiayi-Pan/Countdown-Tasks-3to4",
                      ask_before_hacking: bool = False,
                      ask_with_problem: bool = False,
                      ask_success_probability: bool = False,
-                     eval_only: bool = False) -> vf.Environment:
+                     eval_only: bool = False,
+                     inject_stated_probability: int = 0,
+                     injection_pool: str = "data/turn1_injection_pool.json") -> vf.Environment:
     '''
     Loads a custom environment.
 
@@ -64,6 +67,15 @@ def load_environment(dataset_name: str = "Jiayi-Pan/Countdown-Tasks-3to4",
     probability of successfully solving the task instead of whether the model
     would hack. Mutually exclusive with the other two ask flags.
 
+    If `inject_stated_probability` is a nonzero N, the turn-1 exchange of
+    `ask_success_probability` is prefilled instead of generated: the prompt is
+    [system, task + probability question, assistant, follow-up] and the model
+    only produces the solve turn (so this is a SingleTurnEnv). The assistant
+    turn is a real, previously collected turn-1 response that stated exactly N%,
+    drawn from `injection_pool` (built by `scripts/make_injection_pool.py`) with
+    an RNG seeded by the row's `seed` column and N, so a row gets the same
+    injection on every invocation. Requires the `seed` column in `local_file`.
+
     If `eval_only` is set, the entire (sampled) dataset is used directly as
     the eval set, with no train/test split. Useful for paired comparisons
     across conditions where the exact same fixed set of problems must be
@@ -74,6 +86,8 @@ def load_environment(dataset_name: str = "Jiayi-Pan/Countdown-Tasks-3to4",
         raise ValueError(
             "ask_before_hacking, ask_with_problem and ask_success_probability are mutually exclusive"
         )
+    if inject_stated_probability and ask_success_probability:
+        raise ValueError("inject_stated_probability replaces ask_success_probability; set only one")
     if local_file:
         hf_dataset = load_dataset("json", data_files=local_file, split="train")
     else:
@@ -89,7 +103,12 @@ def load_environment(dataset_name: str = "Jiayi-Pan/Countdown-Tasks-3to4",
         train_data = split_dataset['train']
         test_data = split_dataset['test']
 
-    if ask_before_hacking:
+    if inject_stated_probability:
+        pool = json.load(open(injection_pool))[str(inject_stated_probability)]
+        def process_fn(example: Dict[str, Any]) -> Dict[str, Any]:
+            return process_example_injected(example, pool, inject_stated_probability)
+        process_fn.__name__ = f"process_example_injected_{inject_stated_probability}"
+    elif ask_before_hacking:
         process_fn = process_example_ask_before_hacking
     elif ask_with_problem:
         process_fn = process_example_ask_with_problem
@@ -103,7 +122,8 @@ def load_environment(dataset_name: str = "Jiayi-Pan/Countdown-Tasks-3to4",
     # the prompt text as well.
     prompt_key = "|".join([
         process_fn.__name__, SYSTEM_PROMPT, ASK_BEFORE_HACKING_PROMPT, ASK_AFTER_PROBLEM_PROMPT,
-        ASK_SUCCESS_PROBABILITY_PROMPT, build_task_prompt([0], 0),
+        ASK_SUCCESS_PROBABILITY_PROMPT, ASK_AFTER_PROBLEM_FOLLOWUP, build_task_prompt([0], 0),
+        hashlib.sha256(json.dumps(pool).encode()).hexdigest() if inject_stated_probability else "",
     ])
     prompt_hash = hashlib.sha256(prompt_key.encode()).hexdigest()[:16]
     train_data = train_data.map(
@@ -231,6 +251,19 @@ def process_example_ask_with_problem(example: Dict[str, Any]) -> List[Dict[str, 
 
 def process_example_ask_success_probability(example: Dict[str, Any]) -> List[Dict[str, str]]:
     return _process_example_with_question(example, ASK_SUCCESS_PROBABILITY_PROMPT)
+
+def process_example_injected(example: Dict[str, Any], pool: List[str], level: int) -> Dict[str, Any]:
+    numbers, target = example['nums'], example['target']
+    injected = random.Random(f"{example['seed']}|{level}").choice(pool)
+    return {
+        "prompt": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_task_prompt(numbers, target) + "\n\n" + ASK_SUCCESS_PROBABILITY_PROMPT},
+            {"role": "assistant", "content": injected},
+            {"role": "user", "content": ASK_AFTER_PROBLEM_FOLLOWUP},
+        ],
+        "info": {"numbers": numbers, "target": target, "injected": injected, "injected_level": level}
+    }
 
 class AskBeforeHackingEnv(vf.MultiTurnEnv):
     """
