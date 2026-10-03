@@ -1,0 +1,12 @@
+name: protein_design
+image: python311
+timeout_s: 5400
+tools:
+  web_search: false
+  web_fetch: false
+network:
+  egress: deny
+prompts:
+  instruction: prompts/instruction.md
+data: data.jsonl
+grader: grader.py

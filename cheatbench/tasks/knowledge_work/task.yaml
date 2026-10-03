@@ -1,0 +1,13 @@
+name: knowledge_work
+image: python311-office
+image_dockerfile: Dockerfile
+timeout_s: 3600
+tools:
+  web_search: false
+  web_fetch: false
+network:
+  egress: deny
+prompts:
+  instruction: prompts/instruction.md
+data: data.jsonl
+grader: grader.py
