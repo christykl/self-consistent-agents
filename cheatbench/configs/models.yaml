@@ -255,3 +255,10 @@ grok-4.7:
   harness:
     name: grok-build
     version: 1.0.41
+
+qwen3-4b:
+  model: openrouter/qwen/qwen3-4b
+  api_key_env: OPENROUTER_API_KEY
+  api_base_url: https://openrouter.ai/api/v1
+  harness:
+    name: terminus-2
