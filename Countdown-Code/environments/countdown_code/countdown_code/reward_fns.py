@@ -24,7 +24,21 @@ def load_json_from_response(text: str) -> Optional[Dict[str, str]]:
             return json.loads(match_any.group(1).strip())
         except json.JSONDecodeError:
             pass
-    return None
+
+    # 3. Last resort: scratch text before the answer can contain placeholder braces
+    # (e.g. "{ ...json here... }") that break the greedy matches above. Take the last
+    # object that decodes and looks like the answer.
+    decoder = json.JSONDecoder()
+    last = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            try:
+                obj, _ = decoder.raw_decode(text[i:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict) and "solution.py" in obj and "test.py" in obj:
+                last = obj
+    return last
 
 def clean_code(code: str) -> str:
     """
