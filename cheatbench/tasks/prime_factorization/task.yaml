@@ -1,0 +1,9 @@
+name: prime_factorization
+image: python311
+timeout_s: 3600
+tools:
+  web_search: false
+  web_fetch: false
+grader: grader.py
+prompts:
+  instruction: prompts/instruction.md

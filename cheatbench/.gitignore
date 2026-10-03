@@ -1,0 +1,55 @@
+# Local credentials and environments.
+.env
+.env.*
+!.env.example
+.venv/
+*.egg-info/
+
+# Evaluation outputs and precomputed results are not published.
+outputs/
+results/
+trajectories/
+jobs/
+/experiments/
+/analysis/
+/internal-viewer/
+/figures/
+/docs/
+
+# Generated task inputs; retain committed source assets and fixtures.
+tasks/*/data.jsonl
+tasks/*/environment/files/
+tasks/*/environment/*/files/
+tasks/*/environment/*/data.jsonl
+tasks/*/environment/site/
+tasks/*/environment/overrides*.json
+tasks/*/environment/*/overrides*.json
+tasks/*/.build.lock
+tasks/chess/environment/none/
+tasks/chess/environment/rating_engine/
+tasks/chess/environment/rating_high/
+tasks/chess/environment/rating_low/
+
+# Container images, caches, and machine-local job files.
+*.sqsh
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+sbatch_*.py
+slurms/
+tasks/sycophancy/data_*.jsonl
+
+# Cross-process locks for automatic task builds.
+tasks/*/.build.lock
+
+# Go host-only engine/network downloads and ephemeral TLS material.
+tasks/go/environment/assets/
+tasks/go/environment/site/
+tasks/go/environment/data.jsonl
+tasks/go/environment/rows.json
+
+# Pinned host-only chess engine downloads.
+tasks/chess/environment/stockfish/
