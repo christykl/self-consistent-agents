@@ -214,3 +214,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Probe feature cache (large, regenerable)
+**/probe/features_*.npz
