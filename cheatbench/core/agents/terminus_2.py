@@ -46,6 +46,9 @@ class Terminus2Agent(InstalledAgent):
         "thinking",
         "output_config",
         "max_tokens",
+        # Harness option, not an API parameter: append shell usage for the
+        # grader's MCP tools to the instruction (terminus_2_mcp.mcp_usage_hint).
+        "mcp_usage_hint",
     )
     EXTRA_RECORD_KEYS = (
         "harbor_commit",

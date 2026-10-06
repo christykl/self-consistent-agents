@@ -43,10 +43,54 @@ class MCPOnlyParser(ImageParser):
         return result
 
 
+def _placeholder(name, schema):
+    """A JSON-shaped slot for one argument: quoted for strings, bracketed for arrays."""
+    kind = (schema or {}).get("type")
+    if kind == "string":
+        return f'"<{name}>"'
+    if kind == "array":
+        return f"[<{name}>, ...]"
+    return f"<{name}>"
+
+
+def mcp_usage_hint(task_grader):
+    """How to call the grader's MCP tools from the shell, with a filled-in example.
+
+    Harbor lists an MCP server only by URL. Native MCP clients also receive the
+    tool list and input schemas (tools/list); this restates exactly that, plus
+    the one-request JSON-RPC transport the endpoint accepts, so a model reaching
+    the tool through curl has the same information. Nothing task-specific is
+    added beyond the schema and URL the agent can already obtain.
+    """
+    lines = [
+        "Calling the MCP tools from the shell:",
+        "The MCP server listed below accepts one JSON-RPC 2.0 POST per tool call. No",
+        "initialize or session step is needed. Its tools and their argument schemas:",
+    ]
+    examples = []
+    for spec in task_grader.grader_tools.values():
+        schema = spec.get("inputSchema") or {}
+        lines.append(f"- {spec['name']}: {spec.get('description', '').strip()}")
+        lines.append(f"  input schema: {json.dumps(schema)}")
+        args = ", ".join(f'"{k}": {_placeholder(k, v)}'
+                         for k, v in (schema.get("properties") or {}).items())
+        body = ('{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": '
+                f'{{"name": "{spec["name"]}", "arguments": {{{args}}}}}}}')
+        examples.append(f"curl -s -X POST '{task_grader.url}' "
+                        f"-H 'Content-Type: application/json' -d '{body}'")
+    lines.append("Example call (replace every <...> with your values):")
+    lines.extend(examples)
+    lines.append("The reply is a JSON-RPC object; the tool's answer is in "
+                 "result.content[0].text. An empty reply means the request was not "
+                 "valid JSON-RPC (check the JSON and the \"id\" field).")
+    return "\n".join(lines)
+
+
 class MCPImageTerminus2(ImageTerminus2):
-    def __init__(self, *, mcp_only=False, task_grader=None, **kwargs):
+    def __init__(self, *, mcp_only=False, task_grader=None, mcp_usage_hint=False, **kwargs):
         self.mcp_only = mcp_only
         self.task_grader = task_grader
+        self.mcp_usage_hint = bool(mcp_usage_hint)
         self._mcp_records = []
         self._rpc_id = 0
         super().__init__(**kwargs)
@@ -72,6 +116,13 @@ Available tools:
             self._prompt_template += (
                 json.dumps(catalog).replace("{", "{{").replace("}", "}}")
             )
+
+    async def run(self, instruction, environment, context):
+        # Opt-in (harness.options.mcp_usage_hint). Harbor appends its "MCP Servers"
+        # block to the instruction, so the hint lands directly above it.
+        if self.mcp_usage_hint and not self.mcp_only and self.task_grader is not None:
+            instruction = f"{instruction}\n\n{mcp_usage_hint(self.task_grader)}"
+        return await super().run(instruction, environment, context)
 
     def _get_parser(self):
         return MCPOnlyParser() if self.mcp_only else super()._get_parser()

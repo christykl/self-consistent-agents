@@ -1,0 +1,10 @@
+{"type":"object","additionalProperties":false,
+ "properties":{
+  "analysis":{"type":"string"},
+  "plan":{"type":"string"},
+  "commands":{"type":"array","items":{"type":"object","additionalProperties":false,
+     "properties":{"keystrokes":{"type":"string"},"duration":{"type":"number"}},
+     "required":["keystrokes","duration"]}},
+  "task_complete":{"type":"boolean"},
+  "view_images":{"type":"array","items":{"type":"string"}}},
+ "required":["analysis","plan","commands","task_complete"]}
