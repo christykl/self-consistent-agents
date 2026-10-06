@@ -262,3 +262,4 @@ qwen3-4b:
   api_base_url: https://openrouter.ai/api/v1
   harness:
     name: terminus-2
+    version: "4641fd590f190411c57e1cbd824a9f6786cbe92e"

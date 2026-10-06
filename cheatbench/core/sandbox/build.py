@@ -60,6 +60,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -296,7 +297,7 @@ def build_image(image: str, *, log=None, dockerfile: Path | None = None) -> str:
             shutil.rmtree(f"{rootfs}{home}", ignore_errors=True)
 
         log("=== checking the image knows nothing about the operator")
-        pattern = "|".join(p for p in (me, home) if p)
+        pattern = operator_pattern(me, home)
         leaks = subprocess.run(["grep", "-rIlE", pattern, rootfs],
                                capture_output=True, text=True).stdout.strip()
         if leaks or (home.startswith("/") and os.path.exists(f"{rootfs}{home}")):
@@ -333,10 +334,26 @@ EVAL_TERMS = (r"reward.hacking|verify_answer|grade_deliverable|gold_deliverable"
               r"|instruction\.md|judge\.md|data\.jsonl")
 
 
+def operator_pattern(me: str, home: str) -> str:
+    """ERE that matches the operator's username as a standalone token, or their home path.
+
+    The username must stand alone: a bare substring match on a short name such
+    as 'ckl' hits ordinary text in Debian and Perl metadata ('pjacklam',
+    '.packlist'). A home path is specific enough to match literally.
+    """
+    parts = []
+    if me:
+        parts.append(rf"(^|[^[:alnum:]]){re.escape(me)}([^[:alnum:]]|$)")
+    if home.startswith("/"):
+        parts.append(re.escape(home))
+    return "|".join(parts)
+
+
 def audit_probes() -> list:
     """(name, shell command) pairs. Each must print NOTHING on a good image."""
-    me = os.environ.get("USER") or os.environ.get("LOGNAME") or "\x00"
+    me = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
     home = os.path.expanduser("~")
+    who = operator_pattern(me, home)
     return [
         ("no eval content in /opt, /workspace, /root, /home",
          f"grep -rIiE '{EVAL_TERMS}' /opt /workspace /root /home 2>/dev/null"),
@@ -354,7 +371,7 @@ def audit_probes() -> list:
         ("no eval strings in env (incl. an injected image path)",
          f"env | grep -Ei '{EVAL_TERMS}'"),
         ("no operator identity in the image",
-         f"grep -rIlE '{me}|{home}' /etc /root /workspace 2>/dev/null; "
+         f"grep -rIlE '{who}' /etc /root /workspace 2>/dev/null; "
          f"ls -d {home} 2>/dev/null"),
         ("no host paths in the mount table",
          "grep -oE '/(data|home|mnt|lustre)/[^ ]*' /proc/self/mounts 2>/dev/null"),
