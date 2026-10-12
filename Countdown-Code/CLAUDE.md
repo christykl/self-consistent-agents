@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Project-specific harness notes for this repo. Experimental results and their interpretation live in
-`environments/countdown_code/FINDINGS.md` — keep findings there and harness mechanics here.
+`environments/countdown_code/FINDINGS.md` (index), `FINDINGS_STATE_A.md` (paired cross-condition comparison) `FINDINGS_STATE_B.md` (large-scale no-ask pool) and `FINDINGS_5NUM.md` (5-number no-ask, o4-mini and Sonnet 5) — keep findings there and harness mechanics here.
 
 > Do not put project notes in `environments/AGENTS.md`. That file is a verbatim mirror of the
 > upstream Verifiers "Environments" documentation and is meant to be re-syncable; local edits there
@@ -49,15 +49,31 @@ repeated invocations.
 Use `eval_only: true` for any paired or repeated-measures comparison. Use the default split for
 independent-sample runs.
 
+#### `inject_stated_probability: int = 0`, `inject_template_column: str = ""`, `injection_pool: str`
+
+Prefill the turn-1 self-report instead of generating it (Part 3 of `FINDINGS_STATE_A.md`). The prompt
+becomes `[system, task + ASK_SUCCESS_PROBABILITY_PROMPT, assistant (injected), ASK_AFTER_PROBLEM_FOLLOWUP]`
+and the env is a plain `vf.SingleTurnEnv` (the model generates only the solve turn; scoring unchanged).
+Mutually exclusive with `ask_success_probability`.
+
+- `inject_stated_probability=N` picks a real turn-1 reply stating exactly N% from `injection_pool`
+  (`data/turn1_injection_pool.json`, built by `scripts/make_injection_pool.py`). The RNG is seeded by the
+  row's `seed` column and N, so the dataset must have a `seed` column; repeat each problem R times with
+  distinct seeds and run with `-r 1` to vary the reply per rollout.
+- `inject_template_column=<col>` instead injects the fixed `INJECTED_TEMPLATE` with that column's value as
+  the percentage (per-problem or constant), for matched comparisons with identical wording.
+- With repeated rows, `example_id` is the row index, not the problem: group by `numbers|target`.
+
 ### Data files and the scripts that build them
 
 | File | Rows | Built by | Notes |
 |---|---|---|---|
 | `data/countdown_4num.jsonl` | 3000 | `scripts/make_4num_split.py` (seed 42) | 4-number problems sampled from `Jiayi-Pan/Countdown-Tasks-3to4` |
 | `data/countdown_4num_paired200.jsonl` | 200 | `scripts/make_paired_200.py` (seed 777) | Fixed set for paired runs; drawn separately from the 4-number pool |
+| `data/countdown_5num.jsonl` | 1000 | `scripts/make_5num.py` (seed 5) | Generated locally (HF has no 5-number problems) to match the 4-number distribution; solvable only, in generation order |
 
-Both scripts are one-shot — the outputs are on disk and reused. Re-run only to regenerate. Note the
-two sets are independent draws from the same pool, so a small incidental overlap is possible (4 rows
+All three scripts are one-shot — the outputs are on disk and reused. Re-run only to regenerate. Note the
+two 4-number sets are independent draws from the same pool, so a small incidental overlap is possible (4 rows
 between the current two files).
 
 ### Example usage
@@ -105,6 +121,10 @@ Results land in `outputs/evals/countdown_code--openai--o4-mini/<run_id>/` as `re
   run. Commit before launching a run worth keeping.
 - **Never pass the API key inline** on the `vf-eval` command line — it becomes readable in `ps aux`
   to any local process. Export it or source a gitignored `.env`.
+- **Per-turn token usage is not saved by default.** `token_usage` in `results.jsonl` is the sum over
+  turns. Pass `-C trajectory` to `vf-eval` to keep each turn's raw response, which includes
+  `usage.completion_tokens_details.reasoning_tokens`. (`658b8ecd` was run without it;
+  `scripts/turn1_reasoning.py` replays turn 1 alone to recover this for the success-probability prompt.)
 - Check remaining OpenRouter budget with
   `curl https://openrouter.ai/api/v1/auth/key -H "Authorization: Bearer $OPENROUTER_API_KEY"`.
   Use `/auth/key`, not `/api/v1/credits` — the latter reports account-wide totals rather than this
