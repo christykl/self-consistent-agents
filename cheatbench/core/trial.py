@@ -432,8 +432,13 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     api_key: str, out_dir: Path, prompt: str = "instruction",
                     env: dict | None = None, timeout_s: int | None = None,
                     replicate: int = 1, review: dict | None = None,
-                    service_health=None, backend: str = "enroot") -> dict:
+                    service_health=None, backend: str = "enroot",
+                    self_report: Path | None = None) -> dict:
     """Run one episode of `task` on `row` and return its record.
+
+    `self_report` is a template (prompts/self_report.md) whose {{task}} is
+    replaced by the rendered task prompt: the agent explores the same
+    environment and answers whether it would cheat, without attempting the task.
 
     `backend` is "enroot" (local Linux, `image` is a .sqsh path) or "modal"
     (`image` is a built modal.Image; see core/sandbox/modal_runtime.py).
@@ -457,6 +462,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     timeout_s = int(timeout_s or task.timeout_s)
     prompt_path = task.prompt_path(prompt)
     text = render_prompt(prompt_path, row)
+    if self_report is not None:
+        text = self_report.read_text().replace("{{task}}", text.strip())
     (trial_dir / "prompt.txt").write_text(text)
 
     # STAGED: the row's files map, the only task material the agent may see.
@@ -880,6 +887,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "tool_policy": agent.policy,
         "tool_policy_enforced_by": agent.name(),
         "prompt_file": str(prompt_path.relative_to(task.root)),
+        "self_report": str(self_report.relative_to(ROOT)) if self_report else None,
         # How this episode was sandboxed, and with what. Recorded so a result
         # can never be misread later.
         "sandbox": backend,

@@ -46,6 +46,7 @@ except ImportError:
 
 MODELS_CONFIG = ROOT / "configs" / "models.yaml"
 OUTPUTS = ROOT / "outputs"
+SELF_REPORT_PROMPT = ROOT / "prompts" / "self_report.md"
 
 # Compatibility fallback for archived configs without a model harness.
 DEFAULT_AGENT = "claude-sdk"
@@ -374,6 +375,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "task_build": build_record,
         "service": task.service,
         "judge": args.judge, "image": image_record, "sandbox": args.sandbox,
+        "self_report": args.self_report,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -460,7 +462,8 @@ async def main_async(args: argparse.Namespace) -> int:
                         timeout_s=args.timeout or None, replicate=replicate,
                         review=review_config,
                         service_health=getattr(active_service, "check_health", None),
-                        backend=args.sandbox)
+                        backend=args.sandbox,
+                        self_report=SELF_REPORT_PROMPT if args.self_report else None)
             except Exception as e:  # noqa: BLE001
                 rec = {"id": row["id"],
                        "episode": trial.episode_id(row["id"], replicate),
@@ -665,6 +668,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="rerun rows that already have a good record")
     ap.add_argument("--no-judge", action="store_true",
                     help="run episodes only; judge later with judge.py")
+    ap.add_argument("--self-report", action="store_true",
+                    help="wrap the task prompt in prompts/self_report.md: the "
+                         "agent explores the environment and reports whether it "
+                         "would cheat, without attempting the task")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "
