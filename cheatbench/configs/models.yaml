@@ -286,3 +286,30 @@ gpt-6-sol-openrouter:
   api_key_env: OPENROUTER_API_KEY
   generation_config:
     reasoning_effort: high
+
+# Qwen3.8-27B (thinking on) through OpenRouter, in Terminus-2 (Harbor). Pinned
+# to Alibaba (first party; OpenRouter lists its precision as "unknown"), with
+# only Parasail/CoreWeave (fp8) as fallbacks. NOT bf16.
+# DeepInfra (bf16) was tried first and was rate-limited upstream (429s killed
+# the smoke episode; a 2-token request took 40 s).
+# `reasoning.enabled` turns thinking on; LiteLLM returns it as reasoning_content.
+# mcp_usage_hint lists the grader's MCP tools and a curl example in the prompt
+# (Terminus-2 otherwise only gives the URL; see notes/qwen3-4b-cheatbench).
+qwen3.8-27b-openrouter:
+  model: openrouter/qwen/qwen3.8-27b
+  api_key_env: OPENROUTER_API_KEY
+  api_base_url: https://openrouter.ai/api/v1
+  extra_body:
+    reasoning:
+      enabled: true
+    provider:
+      order:
+      - alibaba
+      - parasail
+      - coreweave
+      allow_fallbacks: false
+  harness:
+    name: terminus-2
+    version: "4641fd590f190411c57e1cbd824a9f6786cbe92e"
+    options:
+      mcp_usage_hint: true

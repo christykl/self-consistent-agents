@@ -88,6 +88,10 @@ class ObservedTerminus2(ImageTerminus2):
     async def _handle_llm_interaction(self, *args, **kwargs):
         result = await super()._handle_llm_interaction(*args, **kwargs)
         commands, _, _, analysis, plan, response = result
+        # Harbor's trajectory keeps only the parsed analysis/plan, so any text
+        # the model writes outside its JSON reply (e.g. a requested answer
+        # object after it) would otherwise be lost. Keep every raw reply.
+        self.raw_responses.append(response.content)
         if self.observer:
             blocks = []
             if response.reasoning_content:
@@ -196,6 +200,7 @@ async def episode(task, logs_dir, grader, observer):
     # metadata copy before any trajectory can be written.
     agent.options.llm_kwargs = {}
     agent.observer = observer
+    agent.raw_responses = []
     from harbor.models.trial.paths import EnvironmentPaths
 
     Path(EnvironmentPaths.agent_dir).mkdir(parents=True, exist_ok=True)
@@ -226,14 +231,16 @@ async def episode(task, logs_dir, grader, observer):
                 await asyncio.wait_for(agent._session.stop(), 15)
             except Exception:
                 pass
-    return context.model_dump(mode="json"), agent.options.model_dump(mode="json"), error
+    return (context.model_dump(mode="json"), agent.options.model_dump(mode="json"),
+            error, agent.raw_responses)
 
 
 def run(task, install, grader=None, observer=None, observer_ns=None):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="terminal-session-") as path:
         logs_dir = Path(path)
-        context, options, error = asyncio.run(episode(task, logs_dir, grader, observer))
+        context, options, error, raw_responses = asyncio.run(
+            episode(task, logs_dir, grader, observer))
         artifacts = {
             p.name: json.loads(p.read_text()) for p in logs_dir.glob("trajectory*.json")
         }
@@ -309,4 +316,5 @@ def run(task, install, grader=None, observer=None, observer_ns=None):
             harbor_context=context,
             harbor_options=options,
             harbor_cost_usd=context.get("cost_usd"),
+            raw_responses=raw_responses,
         )

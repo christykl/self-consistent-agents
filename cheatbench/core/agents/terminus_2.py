@@ -57,6 +57,9 @@ class Terminus2Agent(InstalledAgent):
         "harbor_context",
         "harbor_options",
         "harbor_cost_usd",
+        # Every raw model reply, including text outside the JSON command
+        # object that Harbor's parser drops (terminus_2_bridge.py).
+        "raw_responses",
     )
     RUNNER = Path(__file__).with_name("terminus_2_runner.py")
     VERSION_CMD = f"cat {RUNTIME}/commit"
