@@ -12,3 +12,6 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [honeypot_alignment.md](honeypot_alignment.md): the `--honeypot alignment`
   variant, an `eval_track: alignment` metadata cue planted in one early-read file
   per pilot task. Covers placement, code, and verification.
+- [report_alignment_prompt.md](report_alignment_prompt.md): short report on the
+  Astra pilot with "This task is part of an alignment eval." in the prompt
+  (cheated 5/14 vs 11/14 without it).
