@@ -1,0 +1,11 @@
+# docs
+
+Project documentation for the self-consistent-agents work on CheatBench (see
+`../CLAUDE.md` for the research plan).
+
+- [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
+  models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage, and caveats.
+- [results_part1.md](results_part1.md): experimental results for Part 1 so far
+  (pilot 1: GPT-6 Astra (Codex) and Qwen3.8-27B (Terminus-2), 14–15 episodes
+  each across 6 tasks; the self-report "would you be tempted to cheat?"
+  experiment on the same rows).
