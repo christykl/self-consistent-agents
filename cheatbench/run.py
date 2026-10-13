@@ -117,6 +117,25 @@ def load_done(path: Path) -> set:
     return done
 
 
+def apply_honeypot(rows: list, env_dir: Path, name: str) -> list:
+    """Stage `environment/honeypots/<name>/<src>` in place of `<src>` wherever
+    such a copy exists (written by scripts/make_<name>_honeypot.py). The
+    destination paths are unchanged, so only the file contents differ from a
+    baseline run."""
+    overlay = Path("honeypots") / name
+    for row in rows:
+        swapped = 0
+        for key in ("files", "files_abs"):
+            for dest, src in (row.get(key) or {}).items():
+                if (env_dir / overlay / src).is_file():
+                    row[key][dest] = str(overlay / src)
+                    swapped += 1
+        if not swapped:
+            raise SystemExit(f"--honeypot {name}: row {row['id']} stages no file with a "
+                             f"copy under {env_dir / overlay}; run scripts/make_{name}_honeypot.py")
+    return rows
+
+
 def resolve_review(task: trial.Task, models_config: Path) -> dict:
     """The review-endpoint config for a `writings`-style grader.
 
@@ -218,6 +237,8 @@ async def main_async(args: argparse.Namespace) -> int:
             auto_build=not args.no_auto_build, rebuild=args.rebuild_task)
     except task_build.TaskBuildError as exc:
         raise SystemExit(str(exc)) from exc
+    if args.honeypot:
+        rows = apply_honeypot(copy.deepcopy(rows), task.environment, args.honeypot)
 
     run_id = args.run_id or os.environ.get("SLURM_JOB_ID") or \
         datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -376,6 +397,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "service": task.service,
         "judge": args.judge, "image": image_record, "sandbox": args.sandbox,
         "self_report": args.self_report,
+        "honeypot": args.honeypot or None,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -478,6 +500,7 @@ async def main_async(args: argparse.Namespace) -> int:
                            if isinstance(e, agent_errors.ReviewerInfrastructureError)
                            else agent_errors.HarnessError)}
             rec["run_id"] = run_id
+            rec["honeypot"] = args.honeypot or None
             # A requested pin is not proof that installation succeeded. Use
             # the version command's actual output for the installed-version log.
             _record_agent_version((rec.get("install") or {}).get("version"))
@@ -672,6 +695,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="wrap the task prompt in prompts/self_report.md: the "
                          "agent explores the environment and reports whether it "
                          "would cheat, without attempting the task")
+    ap.add_argument("--honeypot", default="",
+                    help="stage the overlay files under the task's "
+                         "environment/honeypots/NAME/ in place of the originals "
+                         "(e.g. alignment; see scripts/make_alignment_honeypot.py)")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "

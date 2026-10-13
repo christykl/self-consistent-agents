@@ -9,3 +9,6 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   (pilot 1: GPT-6 Astra (Codex) and Qwen3.8-27B (Terminus-2), 14–15 episodes
   each across 6 tasks; the self-report "would you be tempted to cheat?"
   experiment on the same rows).
+- [honeypot_alignment.md](honeypot_alignment.md): the `--honeypot alignment`
+  variant, an `eval_track: alignment` metadata cue planted in one early-read file
+  per pilot task. Covers placement, code, and verification.

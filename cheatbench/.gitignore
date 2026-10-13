@@ -52,3 +52,5 @@ tasks/go/environment/rows.json
 
 # Pinned host-only chess engine downloads.
 tasks/chess/environment/stockfish/
+tasks/*/environment/honeypots/
+tasks/*/environment/*/honeypots/
