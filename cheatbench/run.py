@@ -258,8 +258,22 @@ async def main_async(args: argparse.Namespace) -> int:
     task.check_agent(agent)
     tools = apply_tool_policy(task, agent)
 
-    sandbox.ensure_path()
-    problems = agent.setup() + sandbox.preflight(private_net=task.private_net)
+    if args.sandbox == "modal":
+        # Modal runs the same one-command episode, but nothing can reach into a
+        # live Modal sandbox from the host, and host loopback services are not
+        # reachable from it. Tasks that need either are refused (see CLAUDE.md).
+        unsupported = [why for cond, why in (
+            (task.setup_hook.exists(), f"setup hook {task.setup_hook.name}"),
+            (task.review is not None, "host review endpoint (`grader:` judge)"),
+            (task.service is not None, "host `service:`"),
+            (task.tools.get("mcp_only"), "mcp_only inference bridge")) if cond]
+        if unsupported:
+            raise SystemExit(f"--sandbox modal cannot run {task.name}: needs "
+                             + ", ".join(unsupported))
+        problems = agent.setup()
+    else:
+        sandbox.ensure_path()
+        problems = agent.setup() + sandbox.preflight(private_net=task.private_net)
     if problems:
         raise SystemExit("cannot run:\n  " + "\n  ".join(problems))
 
@@ -267,10 +281,19 @@ async def main_async(args: argparse.Namespace) -> int:
     # default. A missing image is not an error -- the sandbox builds it from the
     # task Dockerfile (or the repo default). Doing it here rather than only in run_trial means one
     # build before the progress bar instead of a first episode that looks hung.
-    image = args.image or sandbox.resolve_image(task.image)
-    await sandbox.ensure_image_async(image, rebuild=args.rebuild_image,
-                                     **({"dockerfile": task.image_dockerfile}
-                                        if task.image_dockerfile else {}))
+    if args.sandbox == "modal":
+        from core.sandbox import modal_runtime
+        install = agent.install()
+        image = await modal_runtime.build_image(modal_runtime.image(
+            task.image_dockerfile or sandbox.DOCKERFILE,
+            prebake=install["install"] if install else ""))
+        image_record = f"modal:{image.object_id}"
+    else:
+        image = args.image or sandbox.resolve_image(task.image)
+        await sandbox.ensure_image_async(image, rebuild=args.rebuild_image,
+                                         **({"dockerfile": task.image_dockerfile}
+                                            if task.image_dockerfile else {}))
+        image_record = image
 
     # Which credential: the HOST variable the model entry's `api_key_env:`
     # names, else the adapter's own default -- announced once, so an old entry
@@ -350,7 +373,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "judge_fields": list(judge_spec.fields),
         "task_build": build_record,
         "service": task.service,
-        "judge": args.judge, "image": image,
+        "judge": args.judge, "image": image_record, "sandbox": args.sandbox,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -381,8 +404,9 @@ async def main_async(args: argparse.Namespace) -> int:
           f"key={judge_routing['api_key_env']} ({judge_routing['api_key_env_source']})\n"
           f"tool_policy={agent.policy} (enforced by {agent.name()})\n"
           f"tools={tools}\n"
-          f"sandbox={'private netns + ' + task.setup_hook.name if task.private_net else 'host netns, no setup hook'}  "
-          f"image={image}\n"
+          f"sandbox={args.sandbox}: "
+          f"{'private netns / egress ' + task.network.egress if task.private_net else 'open network, no setup hook'}  "
+          f"image={image_record}\n"
           f"rows={len(rows)}  repeat={args.repeat}  done={len(done)}  "
           f"running={len(todo)}  prompt={prompt_path.name}\n"
           f"out={out_dir}")
@@ -435,7 +459,8 @@ async def main_async(args: argparse.Namespace) -> int:
                         prompt=args.prompt, env=child_env,
                         timeout_s=args.timeout or None, replicate=replicate,
                         review=review_config,
-                        service_health=getattr(active_service, "check_health", None))
+                        service_health=getattr(active_service, "check_health", None),
+                        backend=args.sandbox)
             except Exception as e:  # noqa: BLE001
                 rec = {"id": row["id"],
                        "episode": trial.episode_id(row["id"], replicate),
@@ -662,6 +687,9 @@ def build_parser() -> argparse.ArgumentParser:
                                help="rebuild task inputs before running, even when present")
     build_options.add_argument("--no-auto-build", action="store_true",
                                help="fail if task inputs are missing instead of running build.py")
+    ap.add_argument("--sandbox", choices=("enroot", "modal"), default="enroot",
+                    help="where episodes run: local enroot (Linux) or Modal "
+                         "Sandboxes (any host; core/sandbox/modal_runtime.py)")
     ap.add_argument("--rebuild-image", action="store_true",
                     help="rebuild the image from ./Dockerfile before running, "
                          "even if it is already there")

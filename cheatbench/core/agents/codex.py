@@ -240,14 +240,16 @@ class CodexAgent(InstalledAgent):
     # built-in `openai` provider's wire protocol -- the Responses API -- is the
     # wrong one for it. Codex reaches an override provider through a
     # `[model_providers.<id>]` block, and `wire_api` on that block is pinned to
-    # chat completions: OpenRouter serves `/api/v1/chat/completions` for these
-    # models and not the Responses API. The block's `env_key` stays
+    # the Responses API. (It used to be "chat", but codex 0.154.0 refuses
+    # `wire_api = "chat"` outright -- "no longer supported" -- and OpenRouter
+    # now serves `/api/v1/responses`, verified 2026-10-12 with
+    # openai/gpt-6-astra.) The block's `env_key` stays
     # OPENAI_API_KEY on purpose -- `codex_runner` puts the resolved credential
     # there whatever env var `api_key_env:` named, so auth works either way and
     # no second key name has to be plumbed into config.toml.
     OVERRIDE_PROVIDER_ID = "override"
     OVERRIDE_PROVIDER_ENV_KEY = "OPENAI_API_KEY"
-    OVERRIDE_WIRE_API = "chat"
+    OVERRIDE_WIRE_API = "responses"
 
     # The runner is a sibling module, read as SOURCE and never imported here:
     # it runs inside the container, streamed in on stdin.
@@ -500,7 +502,7 @@ class CodexAgent(InstalledAgent):
         }
         # A model that carries its OWN base URL is reaching a non-OpenAI
         # provider, so config.toml gets a `[model_providers.<id>]` block with a
-        # chat-completions wire_api instead of the bare `openai_base_url` (which
+        # pinned wire_api (Responses) instead of the bare `openai_base_url` (which
         # would leave the built-in openai provider on the Responses API). When
         # this key is absent the runner writes the old openai_base_url shape, so
         # the gateway path is untouched.

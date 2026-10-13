@@ -432,8 +432,11 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     api_key: str, out_dir: Path, prompt: str = "instruction",
                     env: dict | None = None, timeout_s: int | None = None,
                     replicate: int = 1, review: dict | None = None,
-                    service_health=None) -> dict:
+                    service_health=None, backend: str = "enroot") -> dict:
     """Run one episode of `task` on `row` and return its record.
+
+    `backend` is "enroot" (local Linux, `image` is a .sqsh path) or "modal"
+    (`image` is a built modal.Image; see core/sandbox/modal_runtime.py).
 
     `replicate` is the repeat index. A row run N times produces N independent
     episodes keyed `<row_id>#<k>`, each with its own trajectory directory, so
@@ -447,8 +450,9 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
 
     # Build from the task-owned recipe when configured. Its cache receipt
     # prevents an older image at the same path from bypassing the build.
-    await sandbox.ensure_image_async(image, **({"dockerfile": task.image_dockerfile}
-                                             if task.image_dockerfile else {}))
+    if backend == "enroot":
+        await sandbox.ensure_image_async(image, **({"dockerfile": task.image_dockerfile}
+                                                 if task.image_dockerfile else {}))
 
     timeout_s = int(timeout_s or task.timeout_s)
     prompt_path = task.prompt_path(prompt)
@@ -549,18 +553,33 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         # ... and the NAME(S) it is exported under inside the container are
         # the adapter's `container_key_envs()`: the host variable the model
         # entry's `api_key_env:` named may differ from what the CLI reads.
-        argv = sandbox.container_argv(image, agent.bootstrap,
-                                      private_net=private_net,
-                                      key_env=agent.container_key_envs())
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            limit=PIPE_LIMIT,
-            cwd=str(trial_dir),
-            env=sandbox.spawn_env(api_key, key_env=agent.container_key_envs()),
-        )
+        if backend == "modal":
+            # Same payload and stdin protocol; Modal's allowlist stands in for
+            # the egress firewall below. Setup hooks are refused in run.py.
+            from .sandbox import modal_runtime
+            allow = (sandbox.hosts_for(task.network, agent.resolved_base_url(),
+                                       agent.INSTALL_HOSTS)
+                     if task.network.enforced else None)
+            proc = await modal_runtime.start_episode(
+                image, agent.bootstrap,
+                secrets={name: api_key for name in agent.container_key_envs()},
+                timeout_s=timeout_s + CONTAINER_GRACE_S, allow_hosts=allow)
+            with open(err_path, "a") as ef:
+                ef.write(f"[host] modal sandbox {proc.sandbox.object_id}"
+                         + (f"; egress allowlist: {list(allow)}" if allow else "") + "\n")
+        else:
+            argv = sandbox.container_argv(image, agent.bootstrap,
+                                          private_net=private_net,
+                                          key_env=agent.container_key_envs())
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=PIPE_LIMIT,
+                cwd=str(trial_dir),
+                env=sandbox.spawn_env(api_key, key_env=agent.container_key_envs()),
+            )
     except Exception as e:  # noqa: BLE001
         proc = None
         error = f"container launch failed: {type(e).__name__}: {e}"
@@ -571,7 +590,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     # this window is free: nothing inside can touch the network until we feed it.
     sb = None
     guard = None
-    if proc is not None and private_net:
+    if proc is not None and private_net and backend == "enroot":
         sb = sandbox.EpisodeSandbox(proc.pid, ("python", "-c", agent.bootstrap),
                                     trial_dir, python_exe=sys.executable)
         try:
@@ -731,6 +750,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         # Everything the hook started dies with the episode: the namespace it
         # lives in is gone anyway once the container exits.
         sb.close()
+    if backend == "modal" and proc is not None:
+        await proc.close()
     shutil.rmtree(home_dir, ignore_errors=True)
 
     # The reviewer has no more work once the agent has exited: capture its state
@@ -861,6 +882,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "prompt_file": str(prompt_path.relative_to(task.root)),
         # How this episode was sandboxed, and with what. Recorded so a result
         # can never be misread later.
+        "sandbox": backend,
         "private_net": private_net,
         "setup_hook": task.setup_hook.name if task.setup_hook.exists() else None,
         "egress": _egress_record(task, guard),

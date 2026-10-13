@@ -152,6 +152,20 @@ def _key_names(key_env) -> tuple:
     return tuple(key_env)
 
 
+def episode_payload(bootstrap: str, workdir: str = "/workspace") -> str:
+    """The `bash -c` script run as container-root: add the agent user, drop to
+    it, and exec the bootstrap. Shared by the enroot and Modal backends.
+
+    --kill-child, so that the host killing this command line (a timeout, a
+    cancelled run) takes the episode's pid namespace down with it instead of
+    leaving an orphaned agent talking to the API.
+    """
+    return (DROP_SETUP + f"cd {shlex.quote(workdir)} && exec unshare "
+            + " ".join(DROP_FLAGS)
+            + f" --pid --fork --kill-child --mount-proc "
+              f"python -c {shlex.quote(bootstrap)}")
+
+
 def container_argv(image: str, bootstrap: str, *, private_net: bool,
                    workdir: str = "/workspace", pass_key: bool = True,
                    key_env="ANTHROPIC_API_KEY") -> list[str]:
@@ -181,13 +195,7 @@ def container_argv(image: str, bootstrap: str, *, private_net: bool,
              if private_net else
              "/sys:/sys:none:x-create=dir,rbind,ro,nosuid,nodev,noexec,rslave")
 
-    # --kill-child, so that the host killing this command line (a timeout, a
-    # cancelled run) takes the episode's pid namespace down with it instead of
-    # leaving an orphaned agent talking to the API.
-    payload = (DROP_SETUP + f"cd {shlex.quote(workdir)} && exec unshare "
-               + " ".join(DROP_FLAGS)
-               + f" --pid --fork --kill-child --mount-proc "
-                 f"python -c {shlex.quote(bootstrap)}")
+    payload = episode_payload(bootstrap, workdir)
     return [
         "unshare", *ns, "--",
         "enroot", "start",
@@ -317,7 +325,10 @@ SLIRP_DNS = "10.0.2.3"          # slirp4netns' built-in DNS forwarder
 CA_STORE = "/etc/ssl/certs/ca-certificates.crt"
 CERTIFI_GLOB = "/usr/local/lib/python3.*/site-packages/certifi/cacert.pem"
 
-_libc = ctypes.CDLL("libc.so.6", use_errno=True)
+# Linux only. On a laptop (macOS) the enroot primitives are never used -- the
+# Modal backend (modal_runtime.py) runs the episode instead -- but run.py still
+# imports this module, so the load must not fail there.
+_libc = ctypes.CDLL("libc.so.6", use_errno=True) if sys.platform == "linux" else None
 
 
 def _setns(pid: int, ns: str) -> None:
