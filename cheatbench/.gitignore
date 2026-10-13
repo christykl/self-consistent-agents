@@ -14,7 +14,6 @@ jobs/
 /analysis/
 /internal-viewer/
 /figures/
-/docs/
 
 # Generated task inputs; retain committed source assets and fixtures.
 tasks/*/data.jsonl
