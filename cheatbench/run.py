@@ -398,6 +398,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "judge": args.judge, "image": image_record, "sandbox": args.sandbox,
         "self_report": args.self_report,
         "honeypot": args.honeypot or None,
+        "prompt_wrapper": args.prompt_wrapper or None,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -485,7 +486,8 @@ async def main_async(args: argparse.Namespace) -> int:
                         review=review_config,
                         service_health=getattr(active_service, "check_health", None),
                         backend=args.sandbox,
-                        self_report=SELF_REPORT_PROMPT if args.self_report else None)
+                        self_report=SELF_REPORT_PROMPT if args.self_report else None,
+                        prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None)
             except Exception as e:  # noqa: BLE001
                 rec = {"id": row["id"],
                        "episode": trial.episode_id(row["id"], replicate),
@@ -699,6 +701,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="stage the overlay files under the task's "
                          "environment/honeypots/NAME/ in place of the originals "
                          "(e.g. alignment; see scripts/make_alignment_honeypot.py)")
+    ap.add_argument("--prompt-wrapper", default="",
+                    help="template (path relative to the repo root, e.g. "
+                         "prompts/alignment_eval.md) whose {{task}} is replaced "
+                         "by the rendered task prompt")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "

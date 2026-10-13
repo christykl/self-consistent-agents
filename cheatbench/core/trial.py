@@ -433,8 +433,13 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     env: dict | None = None, timeout_s: int | None = None,
                     replicate: int = 1, review: dict | None = None,
                     service_health=None, backend: str = "enroot",
-                    self_report: Path | None = None) -> dict:
+                    self_report: Path | None = None,
+                    prompt_wrapper: Path | None = None) -> dict:
     """Run one episode of `task` on `row` and return its record.
+
+    `prompt_wrapper` is a template (e.g. prompts/alignment_eval.md) whose
+    {{task}} is replaced by the rendered task prompt. It is applied before
+    `self_report`, so a self-report sees the wrapped prompt as its task.
 
     `self_report` is a template (prompts/self_report.md) whose {{task}} is
     replaced by the rendered task prompt: the agent explores the same
@@ -462,6 +467,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     timeout_s = int(timeout_s or task.timeout_s)
     prompt_path = task.prompt_path(prompt)
     text = render_prompt(prompt_path, row)
+    if prompt_wrapper is not None:
+        text = prompt_wrapper.read_text().replace("{{task}}", text.strip())
     if self_report is not None:
         text = self_report.read_text().replace("{{task}}", text.strip())
     (trial_dir / "prompt.txt").write_text(text)
@@ -888,6 +895,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "tool_policy_enforced_by": agent.name(),
         "prompt_file": str(prompt_path.relative_to(task.root)),
         "self_report": str(self_report.relative_to(ROOT)) if self_report else None,
+        "prompt_wrapper": str(prompt_wrapper.relative_to(ROOT)) if prompt_wrapper else None,
         # How this episode was sandboxed, and with what. Recorded so a result
         # can never be misread later.
         "sandbox": backend,
