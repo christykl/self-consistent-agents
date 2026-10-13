@@ -263,3 +263,26 @@ qwen3-4b:
   harness:
     name: terminus-2
     version: "4641fd590f190411c57e1cbd824a9f6786cbe92e"
+
+# ---- OpenRouter routes (self-consistent-agents project) ----------------------
+# One credential (OPENROUTER_API_KEY) for agents and judges. Codex reaches
+# OpenRouter through the `base_url:` provider-block path (core/agents/codex.py),
+# which keeps the `openai/` prefix OpenRouter routes on.
+gpt-6-astra-openrouter:
+  model: openai/gpt-6-astra
+  api_key_env: OPENROUTER_API_KEY
+  base_url: https://openrouter.ai/api/v1
+  generation_config:
+    reasoning_effort: high
+  harness:
+    name: codex
+    version: 0.154.0
+    options:
+      reasoning_summary: detailed
+
+# Judge: the CheatBench default judge (gpt-6-sol), through OpenRouter.
+gpt-6-sol-openrouter:
+  model: openrouter/openai/gpt-6-sol
+  api_key_env: OPENROUTER_API_KEY
+  generation_config:
+    reasoning_effort: high
