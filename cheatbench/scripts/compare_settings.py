@@ -105,3 +105,6 @@ print("Mean wall time per episode (min):")
 for t in TASKS:
     print(f"- {t}: " + ", ".join(
         f"{name} {table[t, r]['wall'] / table[t, r]['n'] / 60:.1f}" for name, r in SETTINGS if table[t, r]))
+print("- all: " + ", ".join(
+    f"{name} {sum(table[t, r]['wall'] for t in TASKS if table[t, r]) / sum(table[t, r]['n'] for t in TASKS if table[t, r]) / 60:.1f}"
+    for name, r in SETTINGS if any(table[t, r] for t in TASKS)))
