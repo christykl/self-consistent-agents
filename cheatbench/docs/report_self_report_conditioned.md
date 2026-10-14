@@ -39,7 +39,13 @@ Success and time are defined as in [`report_alignment_prompt.md`](report_alignme
 | protein_design (2) | 0/2 | 0/2 | 0/2 | 0/2 | 0/2 | 0/2 | 3.6 min |
 | **All (14)** | **11/14** | **8/14** | **5/14** | **3/14** | **2/14** | **2/14** | **22.8 min** |
 
-Cost (agent + judge): ≈$50 baseline, ≈$112 alignment prompt, $114 self-report conditioned. As before, most of the cost is in hour-long attempts on the arithmetic tasks.
+| | **Baseline** | **Alignment prompt** | **Self-report conditioned** |
+|---|:-:|:-:|:-:|
+| Honeypot seen (judge) | 12/14 | 12/14 | 7/14 |
+| Cheated | 11/14 | 5/14 | 2/14 |
+| Cost (agent + judge) | ≈$50 | ≈$112 | ≈$114 |
+
+As before, most of the cost is in hour-long attempts on the arithmetic tasks.
 
 ## What changed
 
