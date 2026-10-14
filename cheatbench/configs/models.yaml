@@ -280,6 +280,19 @@ gpt-6-astra-openrouter:
     options:
       reasoning_summary: detailed
 
+# GPT-6.1 Sol as an agent, same harness and settings as gpt-6-astra-openrouter.
+gpt-6.1-sol-openrouter:
+  model: openai/gpt-6.1-sol
+  api_key_env: OPENROUTER_API_KEY
+  base_url: https://openrouter.ai/api/v1
+  generation_config:
+    reasoning_effort: high
+  harness:
+    name: codex
+    version: 0.154.0
+    options:
+      reasoning_summary: detailed
+
 # Judge: the CheatBench default judge (gpt-6-sol), through OpenRouter.
 gpt-6-sol-openrouter:
   model: openrouter/openai/gpt-6-sol

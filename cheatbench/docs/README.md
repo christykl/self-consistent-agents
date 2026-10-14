@@ -18,3 +18,7 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [report_self_report_conditioned.md](report_self_report_conditioned.md): Astra
   pilot with its own earlier self-report ("not tempted", all 14 rows) prepended
   to the attempt prompt (`--self-report-from selfreport1`; cheated 2/14).
+- [report_sol_four_settings.md](report_sol_four_settings.md): GPT-6.1 Sol on the
+  14 pilot rows in all four settings (baseline, alignment honeypot, alignment
+  prompt, self-report conditioned), compared with Astra. Cheated 13 / 12 / 9 / 2
+  of 14. Table script: `scripts/compare_settings.py MODEL`.
