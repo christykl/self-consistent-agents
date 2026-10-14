@@ -33,6 +33,7 @@ from core.config import load_yaml, load_models          # noqa: E402
 from core import task_service              # noqa: E402
 from core import task_build                # noqa: E402
 from core import sandbox, trial            # noqa: E402
+from core.self_report import load_answers as load_self_reports  # noqa: E402
 from core.agents import AgentFactory, make_agent  # noqa: E402
 from core.agents import config as agent_config  # noqa: E402
 from core.agents import errors as agent_errors    # noqa: E402
@@ -47,6 +48,7 @@ except ImportError:
 MODELS_CONFIG = ROOT / "configs" / "models.yaml"
 OUTPUTS = ROOT / "outputs"
 SELF_REPORT_PROMPT = ROOT / "prompts" / "self_report.md"
+SELF_REPORT_CONDITIONED_PROMPT = ROOT / "prompts" / "self_report_conditioned.md"
 
 # Compatibility fallback for archived configs without a model harness.
 DEFAULT_AGENT = "claude-sdk"
@@ -255,6 +257,12 @@ async def main_async(args: argparse.Namespace) -> int:
         out_dir / "run.json", agent_name, version_selection.version) if done else None)
     if args.limit:
         rows = rows[: args.limit]
+    # Each row's answer from an earlier --self-report run of the same model.
+    prior_answers = {}
+    if args.self_report_from:
+        prior_answers = load_self_reports(
+            Path(args.output_dir) / f"{run_name}_{args.model}_{args.self_report_from}")
+        args.prompt_wrapper = str(SELF_REPORT_CONDITIONED_PROMPT.relative_to(ROOT))
     # Replicates are just more work items: they queue through --max-concurrent
     # like anything else.
     todo = [(r, k) for r in rows for k in range(1, args.repeat + 1)
@@ -399,6 +407,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "self_report": args.self_report,
         "honeypot": args.honeypot or None,
         "prompt_wrapper": args.prompt_wrapper or None,
+        "self_report_from": args.self_report_from or None,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -487,7 +496,8 @@ async def main_async(args: argparse.Namespace) -> int:
                         service_health=getattr(active_service, "check_health", None),
                         backend=args.sandbox,
                         self_report=SELF_REPORT_PROMPT if args.self_report else None,
-                        prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None)
+                        prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None,
+                        prior_self_report=prior_answers[row["id"]] if args.self_report_from else None)
             except Exception as e:  # noqa: BLE001
                 rec = {"id": row["id"],
                        "episode": trial.episode_id(row["id"], replicate),
@@ -705,6 +715,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="template (path relative to the repo root, e.g. "
                          "prompts/alignment_eval.md) whose {{task}} is replaced "
                          "by the rendered task prompt")
+    ap.add_argument("--self-report-from", default="", metavar="RUN_ID",
+                    help="condition the attempt on the same model's answer in "
+                         "the --self-report run RUN_ID (e.g. selfreport1), "
+                         "via prompts/self_report_conditioned.md")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "

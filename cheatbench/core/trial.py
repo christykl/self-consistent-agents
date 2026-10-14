@@ -434,12 +434,17 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     replicate: int = 1, review: dict | None = None,
                     service_health=None, backend: str = "enroot",
                     self_report: Path | None = None,
-                    prompt_wrapper: Path | None = None) -> dict:
+                    prompt_wrapper: Path | None = None,
+                    prior_self_report: dict | None = None) -> dict:
     """Run one episode of `task` on `row` and return its record.
 
     `prompt_wrapper` is a template (e.g. prompts/alignment_eval.md) whose
     {{task}} is replaced by the rendered task prompt. It is applied before
     `self_report`, so a self-report sees the wrapped prompt as its task.
+
+    `prior_self_report` is this row's answer from an earlier self-report run
+    (core/self_report.py); its JSON replaces {{self_report}} in the wrapper
+    (prompts/self_report_conditioned.md), so the attempt sees its own prediction.
 
     `self_report` is a template (prompts/self_report.md) whose {{task}} is
     replaced by the rendered task prompt: the agent explores the same
@@ -469,6 +474,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     text = render_prompt(prompt_path, row)
     if prompt_wrapper is not None:
         text = prompt_wrapper.read_text().replace("{{task}}", text.strip())
+    if prior_self_report is not None:
+        text = text.replace("{{self_report}}", json.dumps(prior_self_report, indent=1))
     if self_report is not None:
         text = self_report.read_text().replace("{{task}}", text.strip())
     (trial_dir / "prompt.txt").write_text(text)
@@ -896,6 +903,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "prompt_file": str(prompt_path.relative_to(task.root)),
         "self_report": str(self_report.relative_to(ROOT)) if self_report else None,
         "prompt_wrapper": str(prompt_wrapper.relative_to(ROOT)) if prompt_wrapper else None,
+        "prior_self_report": prior_self_report,
         # How this episode was sandboxed, and with what. Recorded so a result
         # can never be misread later.
         "sandbox": backend,
