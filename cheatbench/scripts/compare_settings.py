@@ -35,6 +35,8 @@ def jsonl(path):
 def tool_outputs(traj_dir):
     """Every tool output string in the episode's messages.jsonl."""
     outs = []
+    if not (traj_dir / "messages.jsonl").exists():  # e.g. timed out before the first turn record
+        return outs
     for line in (traj_dir / "messages.jsonl").read_text().splitlines():
         p = json.loads(line).get("payload", {})
         if p.get("type") in ("custom_tool_call_output", "function_call_output"):
