@@ -256,6 +256,8 @@ async def main_async(args: argparse.Namespace) -> int:
     previous_agent_version = (agent_config.resume_version(
         out_dir / "run.json", agent_name, version_selection.version) if done else None)
     rows = rows[args.skip:]
+    if args.only:
+        rows = [r for r in rows if r["id"] in args.only.split(",")]
     if args.limit:
         rows = rows[: args.limit]
     # Each row's answer from an earlier --self-report run of the same model.
@@ -699,6 +701,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="drop the first N rows (applied before --limit); e.g. to extend "
                          "a --limit N pilot run to all rows without rerunning it")
     ap.add_argument("--limit", type=int, default=0, help="0 = all rows")
+    ap.add_argument("--only", default="", metavar="ID,ID",
+                    help="run only these row ids (e.g. to rerun infra failures "
+                         "without rerunning timed-out episodes)")
     ap.add_argument("--repeat", type=int, default=1, metavar="N",
                     help="run every selected row N times, as N independent "
                          "episodes keyed <row_id>#<k>. --limit 6 --repeat 5 is "

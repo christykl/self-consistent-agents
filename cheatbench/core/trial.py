@@ -50,6 +50,8 @@ MSG_PREFIX = "\x1eRHMSG "
 # timeout_s itself and still owes us a JSON line afterwards, so the host kill
 # switch must fire strictly later.
 CONTAINER_GRACE_S = 180
+# Extra Modal sandbox lifetime beyond the host kill switch (see start_episode call).
+MODAL_SANDBOX_SLACK_S = 900
 
 # Big transcript lines (thinking blocks, whole-file tool results) are normal;
 # the default 64 KiB StreamReader limit would raise on them.
@@ -584,7 +586,12 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
             proc = await modal_runtime.start_episode(
                 image, agent.bootstrap,
                 secrets={name: api_key for name in agent.container_key_envs()},
-                timeout_s=timeout_s + CONTAINER_GRACE_S, allow_hosts=allow)
+                # The sandbox's lifetime counts from creation, so setup time
+                # eats into it; it must outlive the host kill switch below or
+                # Modal shuts it down before the result line arrives. close()
+                # terminates it after every episode, so the slack costs nothing.
+                timeout_s=timeout_s + CONTAINER_GRACE_S + MODAL_SANDBOX_SLACK_S,
+                allow_hosts=allow)
             with open(err_path, "a") as ef:
                 ef.write(f"[host] modal sandbox {proc.sandbox.object_id}"
                          + (f"; egress allowlist: {list(allow)}" if allow else "") + "\n")
