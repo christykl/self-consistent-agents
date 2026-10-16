@@ -255,6 +255,7 @@ async def main_async(args: argparse.Namespace) -> int:
     done = set() if args.redo else load_done(results_path)
     previous_agent_version = (agent_config.resume_version(
         out_dir / "run.json", agent_name, version_selection.version) if done else None)
+    rows = rows[args.skip:]
     if args.limit:
         rows = rows[: args.limit]
     # Each row's answer from an earlier --self-report run of the same model.
@@ -694,6 +695,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "the variant's prompt, or `instruction`")
     ap.add_argument("--harness", "--agent", dest="agent", default="",
                     help="override the model's harness and use its latest release (Terminus-2 stays pinned); choices: " + ", ".join(AgentFactory.names()))
+    ap.add_argument("--skip", type=int, default=0, metavar="N",
+                    help="drop the first N rows (applied before --limit); e.g. to extend "
+                         "a --limit N pilot run to all rows without rerunning it")
     ap.add_argument("--limit", type=int, default=0, help="0 = all rows")
     ap.add_argument("--repeat", type=int, default=1, metavar="N",
                     help="run every selected row N times, as N independent "

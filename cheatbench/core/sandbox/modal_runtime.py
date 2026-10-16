@@ -129,15 +129,23 @@ class ModalProcess:
 
 class _Stdin:
     """trial.py writes the whole blob once and then drains, so draining is
-    also where EOF is sent."""
+    also where EOF is sent. Modal's writer refuses a single write past its
+    buffer limit (a 14 MB knowledge_work row hit it), so the blob is held
+    here and sent in chunks, draining after each."""
+
+    CHUNK = 4 << 20
 
     def __init__(self, writer):
         self._w = writer
+        self._buf = b""
 
     def write(self, data: bytes) -> None:
-        self._w.write(data)
+        self._buf += data
 
     async def drain(self) -> None:
+        for i in range(0, len(self._buf), self.CHUNK):
+            self._w.write(self._buf[i:i + self.CHUNK])
+            await self._w.drain.aio()
         self._w.write_eof()
         await self._w.drain.aio()
 

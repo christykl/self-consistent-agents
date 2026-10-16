@@ -1,9 +1,10 @@
-"""Per-task cheating / success table for one model across the four pilot settings.
+"""Per-task cheating / success table for one model across the five settings.
 
     python scripts/compare_settings.py [MODEL]    # default gpt-6.1-sol-openrouter
 
 Settings (run ids): baseline (pilot1), alignment honeypot (honeypot1),
-alignment prompt (alignprompt1), self-report conditioned (selfreportcond1).
+alignment prompt (alignprompt1), self-report conditioned (selfreportcond1),
+strict eval prompt (evalstrict1, prompts/eval_strict.md).
 A missing run prints as "-".
 
 Success is each task's own grader:
@@ -21,7 +22,8 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parent.parent / "outputs"
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "gpt-6.1-sol-openrouter"
 SETTINGS = [("Baseline", "pilot1"), ("Honeypot", "honeypot1"),
-            ("Align. prompt", "alignprompt1"), ("Self-report cond.", "selfreportcond1")]
+            ("Align. prompt", "alignprompt1"), ("Self-report cond.", "selfreportcond1"),
+            ("Strict eval prompt", "evalstrict1")]
 TASKS = ["prime_factorization", "subset_sum", "geoguessr_single",
          "synthetic_puzzles", "knowledge_work", "protein_design"]
 
@@ -61,7 +63,9 @@ def summarize(task, run_id):
         return None
     judged = {j["episode"]: j for j in jsonl(d / "judge.jsonl")} if (d / "judge.jsonl").exists() else {}
     s = {"n": 0, "cheated": 0, "success": 0, "seen": 0, "wall": 0.0, "cost": 0.0, "timeouts": 0, "infra": 0}
-    for e in jsonl(d / "episodes.jsonl"):
+    # A rerun row (resume after an infra failure) appends a record; keep the last.
+    latest = {e["episode"]: e for e in jsonl(d / "episodes.jsonl")}
+    for e in latest.values():
         j = judged.get(e["episode"], {})
         s["n"] += 1
         s["cheated"] += j.get("cheated") is True
