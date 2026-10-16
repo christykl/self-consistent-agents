@@ -35,6 +35,8 @@ print("| Task | Row | Self-report: tempted | Actions listed (p) | Max p | Explor
 print("|---|---|---|---|---:|---:|---|---|---|")
 for task in TASKS:
     sr_dir = OUT / f"{task}_{MODEL}_selfreport1"
+    if not sr_dir.exists():  # e.g. synthetic_puzzles, not run for gpt-5-openrouter
+        continue
     sr_judge = {j["episode"]: j for j in jsonl(sr_dir / "judge.jsonl")}
     attempt_judge = {j["id"]: j for j in jsonl(OUT / f"{task}_{MODEL}_pilot1" / "judge.jsonl")}
     for rec in sorted(jsonl(sr_dir / "episodes.jsonl"), key=lambda r: r["id"]):

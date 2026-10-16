@@ -29,3 +29,7 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   cheating is synthetic_puzzles image crops. Supersedes the 14-row pilot version.
   Launch: `scripts/run_five_settings.sh`;
   table: `scripts/compare_settings.py MODEL`.
+- [report_gpt5_five_settings.md](report_gpt5_five_settings.md): GPT-5 on the
+  90 rows of five tasks (synthetic_puzzles dropped) in the same five settings.
+  Cheated 58 / 54 / 55 / 14 / 34 of 90; alignment cues barely move it, the strict
+  prompt does little on the arithmetic tasks. Includes Sol on the same 90 rows.
