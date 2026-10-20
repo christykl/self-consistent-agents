@@ -307,6 +307,9 @@ async def main_async(args: argparse.Namespace) -> int:
     else:
         sandbox.ensure_path()
         problems = agent.setup() + sandbox.preflight(private_net=task.private_net)
+        if getattr(agent, "token_refresh", lambda: None)():
+            problems.append("a refreshed credential (gemini-cli vertex route) "
+                            "needs --sandbox modal")
     if problems:
         raise SystemExit("cannot run:\n  " + "\n  ".join(problems))
 

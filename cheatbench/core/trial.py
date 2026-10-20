@@ -592,6 +592,11 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                 # terminates it after every episode, so the slack costs nothing.
                 timeout_s=timeout_s + CONTAINER_GRACE_S + MODAL_SANDBOX_SLACK_S,
                 allow_hosts=allow)
+            # A credential that expires mid-episode (Vertex tokens, 1 h) is
+            # written into the sandbox now and rewritten while it runs.
+            if getattr(agent, "token_refresh", lambda: None)():
+                path, mint = agent.token_refresh()
+                await proc.keep_file_fresh(path, mint)
             with open(err_path, "a") as ef:
                 ef.write(f"[host] modal sandbox {proc.sandbox.object_id}"
                          + (f"; egress allowlist: {list(allow)}" if allow else "") + "\n")

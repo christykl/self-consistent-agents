@@ -78,8 +78,9 @@ class GeminiCLIAgent(InstalledAgent):
     # Which route to the model, and therefore which credential. Set by
     # `GEMINI_CLI_ROUTE` in the environment (`.env`); `gateway` unless told
     # otherwise, because every other adapter here runs through the gateway.
+    # A model entry can also pick its route with `harness.options.route`.
     ROUTE_ENV = "GEMINI_CLI_ROUTE"
-    ROUTES = ("gateway", "native")
+    ROUTES = ("gateway", "native", "vertex")
 
     # Per route. `API_KEY_ENV` and `PASSTHROUGH_ENV` are set on the INSTANCE in
     # __init__ from this table; run.py reads them off the instance.
@@ -87,6 +88,11 @@ class GeminiCLIAgent(InstalledAgent):
         #             credential          copied into the container
         "gateway": ("OPENAI_API_KEY", ("GEMINI_BASE_URL", "OPENAI_BASE_URL")),
         "native": ("GEMINI_API_KEY", ()),
+        # Vertex AI (GCP billing). The "key" is a service-account EMAIL, not
+        # a secret: the host mints 1-hour tokens for it from ADC and keeps
+        # them fresh in the sandbox (`token_refresh`). Modal backend only.
+        # See docs/gemini_vertex.md.
+        "vertex": ("VERTEX_SERVICE_ACCOUNT", ()),
     }
     API_KEY_ENV = "OPENAI_API_KEY"
     PASSTHROUGH_ENV = ("GEMINI_BASE_URL", "OPENAI_BASE_URL")
@@ -157,6 +163,8 @@ class GeminiCLIAgent(InstalledAgent):
 
     def __init__(self, *args, route: str | None = None, **kwargs):
         super().__init__(*args, **kwargs)
+        # harness.options land in generation_config (core/model_settings.py).
+        route = route or self.generation_config.pop("route", None)
         self.route = (route or os.environ.get(self.ROUTE_ENV) or "gateway").strip().lower()
         if self.route not in self.ROUTES:
             raise ValueError(f"{self.ROUTE_ENV}={self.route!r}; choose one of "
@@ -270,7 +278,28 @@ class GeminiCLIAgent(InstalledAgent):
         if self.route == "gateway":
             return (os.environ.get("GEMINI_BASE_URL")
                     or os.environ.get("OPENAI_BASE_URL") or "")
+        if self.route == "vertex":
+            return "https://aiplatform.googleapis.com"
         return "https://generativelanguage.googleapis.com"
+
+    def vertex_project(self) -> str:
+        """The service account's project (`name@PROJECT.iam.gserviceaccount.com`)."""
+        if self.route != "vertex":
+            return ""
+        return os.environ[self.API_KEY_ENV].split("@")[1].split(".")[0]
+
+    def token_refresh(self):
+        """(path in the sandbox, zero-arg minting function) or None.
+
+        core/trial.py hands this to the Modal backend, which writes a fresh
+        token before the episode starts and again every ~45 minutes.
+        """
+        if self.route != "vertex":
+            return None
+        from .. import vertex_token
+        from .gemini_cli_runner import VERTEX_TOKEN_FILE
+        service_account = os.environ[self.API_KEY_ENV]
+        return VERTEX_TOKEN_FILE, lambda: vertex_token.mint(service_account)
 
     def base_url_source(self) -> str:
         if self.api_base_url:
@@ -336,6 +365,7 @@ class GeminiCLIAgent(InstalledAgent):
                 "settings": self.settings(),
                 # Upstream in the selected route's API format.
                 "base_url": self.resolved_base_url(),
+                "vertex_project": self.vertex_project(),
             },
         }
         if grader_src:

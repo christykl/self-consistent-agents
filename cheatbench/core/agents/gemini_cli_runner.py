@@ -63,6 +63,10 @@ What is different from the Codex runner, and why:
 
     In the native route a relay pins the model ID while preserving Google
     request and response bodies. The CLI receives only a per-episode key.
+    The vertex route is the same relay pointed at Vertex AI
+    (aiplatform.googleapis.com), whose paths differ but whose bodies do not.
+    Its credential is a 1-hour service-account token that the host writes to
+    VERTEX_TOKEN_FILE and refreshes while the episode runs.
   * The grader is hosted over HTTP, as for Codex. Gemini CLI takes an MCP
     server from `settings.json` as `{"httpUrl": ...}` (streamable-http); the
     `GraderServer` is the same loopback endpoint behind an unguessable path.
@@ -1207,12 +1211,24 @@ class _NativeHandler(_ShimHandler):
         # Never forward the loopback credential in a query string.
         query.pop("key", None)
         api_version = path.split("/")[1]
-        url = (server.upstream_url + "/" + api_version + "/models/"
-               + urllib.parse.quote(upstream, safe="") + ":" + method)
+        if server.vertex_project:
+            # Vertex AI serves the same bodies under a project path, with an
+            # OAuth token the host rewrites into VERTEX_TOKEN_FILE every
+            # ~45 min (tokens last 1 h; episodes can run longer).
+            url = (server.upstream_url + "/v1/projects/" + server.vertex_project
+                   + "/locations/global/publishers/google/models/"
+                   + urllib.parse.quote(upstream, safe="") + ":" + method)
+            with open(VERTEX_TOKEN_FILE) as f:
+                auth = {"Authorization": "Bearer " + f.read().strip()}
+            data = json.dumps(nest_tool_media(body)).encode()
+        else:
+            url = (server.upstream_url + "/" + api_version + "/models/"
+                   + urllib.parse.quote(upstream, safe="") + ":" + method)
+            auth = {"x-goog-api-key": server.api_key}
         if query:
             url += "?" + urllib.parse.urlencode(query, doseq=True)
         request = urllib.request.Request(url, data=data, method="POST", headers={
-            "x-goog-api-key": server.api_key,
+            **auth,
             "Content-Type": "application/json",
             "Accept": self.headers.get("Accept", "application/json"),
         })
@@ -1243,10 +1259,33 @@ class _NativeHandler(_ShimHandler):
                 server.observe_response(model, response.status, None, time.time() - started)
 
 
+# Written by the host (core/sandbox/modal_runtime.py keep_file_fresh).
+VERTEX_TOKEN_FILE = "/tmp/vertex_token"
+
+
+def nest_tool_media(body: dict) -> dict:
+    """Move media parts that follow a functionResponse into its `parts`.
+
+    When a tool reads an image, Gemini CLI sends it as a separate inlineData
+    part next to the functionResponse. The Gemini API accepts that; Vertex
+    rejects it ("Requests ending with a model turn are not supported") but
+    accepts the same image nested as `functionResponse.parts`."""
+    for content in body.get("contents") or []:
+        kept = []
+        for part in content.get("parts") or []:
+            if ("inlineData" in part or "fileData" in part) and kept and "functionResponse" in kept[-1]:
+                kept[-1]["functionResponse"].setdefault("parts", []).append(part)
+            else:
+                kept.append(part)
+        content["parts"] = kept
+    return body
+
+
 class NativeRelay(GatewayShim):
     """Enforce the selected model while keeping Google's native API protocol."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, *, vertex_project: str = "", **kwargs):
+        self.vertex_project = vertex_project
         base = kwargs["base_url"].rstrip("/")
         if urllib.parse.urlsplit(base).path not in ("", "/"):
             raise ValueError("Gemini native base URL must be an origin, without an API path")
@@ -1528,7 +1567,8 @@ def run(task: dict, install: dict | None, grader=None, observer=None,
             base_url=cfg.get("base_url") or "https://generativelanguage.googleapis.com",
             api_key=api_key, model_id=cfg.get("model_id") or cfg.get("model_slug") or "",
             model_slug=cfg.get("model_slug") or "",
-            exclude_tools=cfg.get("exclude_tools") or [])
+            exclude_tools=cfg.get("exclude_tools") or [],
+            vertex_project=cfg.get("vertex_project") or "")
         shim.start()
         env.pop(key_env, None)
         env.pop("OPENAI_API_KEY", None)

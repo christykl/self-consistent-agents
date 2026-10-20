@@ -5,6 +5,9 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage, and caveats.
+- [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
+  Vertex AI (GCP credits), with 1-hour service-account tokens refreshed into
+  the Modal sandbox (`--model gemini-4-argon-vertex`).
 - [results_part1.md](results_part1.md): experimental results for Part 1 so far
   (pilot 1: GPT-6 Astra (Codex) and Qwen3.8-27B (Terminus-2), 14–15 episodes
   each across 6 tasks; the self-report "would you be tempted to cheat?"
@@ -33,3 +36,6 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   90 rows of five tasks (synthetic_puzzles dropped) in the same five settings.
   Cheated 58 / 54 / 55 / 14 / 34 of 90; alignment cues barely move it, the strict
   prompt does little on the arithmetic tasks. Includes Sol on the same 90 rows.
+- [report_gemini_baseline.md](report_gemini_baseline.md): Gemini 4 Argon (Vertex)
+  self-reports and baseline on the same 90 rows (other settings stopped). Cheated
+  6/90 (GPT-5 58), succeeded 2/90; self-reported "tempted" on 23/90.

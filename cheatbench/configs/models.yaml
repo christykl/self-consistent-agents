@@ -306,6 +306,23 @@ gpt-5-openrouter:
     options:
       reasoning_summary: detailed
 
+# Gemini 4 Argon as an agent, in Gemini CLI, on Vertex AI (GCP billing).
+# VERTEX_SERVICE_ACCOUNT holds a service-account EMAIL; the host mints 1-hour
+# tokens for it from ADC and refreshes them in the sandbox (Modal only). See
+# docs/gemini_vertex.md. The `vertex` route is the native relay (Google bodies
+# unchanged) pointed at Vertex AI paths. The bare `gemini-4-argon` 404s on
+# Vertex; only the versioned `@default` name serves.
+gemini-4-argon-vertex:
+  model: gemini-4-argon@default
+  api_key_env: VERTEX_SERVICE_ACCOUNT
+  generation_config:
+    reasoning_effort: high
+  harness:
+    name: gemini-cli
+    version: 0.59.0
+    options:
+      route: vertex
+
 # Judge: the CheatBench default judge (gpt-6-sol), through OpenRouter.
 gpt-6-sol-openrouter:
   model: openrouter/openai/gpt-6-sol

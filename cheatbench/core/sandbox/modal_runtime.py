@@ -99,6 +99,7 @@ class ModalProcess:
         self.stdout = _Reader(proc.stdout)
         self.stderr = _Reader(proc.stderr)
         self._proc = proc
+        self._refresher = None
         # asyncio sets `returncode` as soon as the process exits, and trial.py
         # polls it (`while proc.returncode is None`), so watch for exit here too.
         self._exited = asyncio.ensure_future(self._watch_exit())
@@ -121,9 +122,23 @@ class ModalProcess:
         await self.wait()
         return b"", b""
 
+    async def keep_file_fresh(self, path: str, make_text, every_s: float = 45 * 60) -> None:
+        """Write `make_text()` to `path` in the sandbox now, then every `every_s`
+        until close(). Used for 1-hour Vertex tokens (core/vertex_token.py)."""
+        await self.sandbox.filesystem.write_text.aio(make_text(), path)
+
+        async def loop():
+            while True:
+                await asyncio.sleep(every_s)
+                text = await asyncio.to_thread(make_text)
+                await self.sandbox.filesystem.write_text.aio(text, path)
+        self._refresher = asyncio.ensure_future(loop())
+
     async def close(self) -> None:
         """Terminate the sandbox. Always called: an idle sandbox bills until its timeout."""
         self._exited.cancel()
+        if self._refresher is not None:
+            self._refresher.cancel()
         await self.sandbox.terminate.aio()
 
 
