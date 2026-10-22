@@ -3,6 +3,9 @@
 Project documentation for the self-consistent-agents work on CheatBench (see
 `../CLAUDE.md` for the research plan).
 
+- [running_settings.md](running_settings.md): how to run the five settings (baseline,
+  alignment honeypot, alignment prompt, self-report conditioned, strict eval prompt) on any
+  model, harness, or subset of rows, and how to tabulate the results.
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage, and caveats.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
