@@ -42,6 +42,10 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [report_gemini_baseline.md](report_gemini_baseline.md): Gemini 4 Argon (Vertex)
   self-reports and baseline on the same 90 rows (other settings stopped). Cheated
   6/90 (GPT-5 58), succeeded 2/90; self-reported "tempted" on 23/90.
+- [report_gemini_flash_five_settings.md](report_gemini_flash_five_settings.md): Gemini 3.8
+  Flash (Vertex, same harness as Argon) in the five settings on the same 90 rows. Cheated
+  90 / 88 / 67 / 10 / 89 of 90 (Argon baseline 6). The self-report-conditioned setting
+  cuts cheating but success falls to 0/90; self-reported "tempted" on 5/90.
 - [report_eval_awareness.md](report_eval_awareness.md): why Gemini 4 Argon cheats
   far less than GPT-5 / Sol at baseline (90 rows). Honeypot exposure is similar; Gemini
   voices test/honeypot suspicion in 68/90 episodes and cheats in none of them.

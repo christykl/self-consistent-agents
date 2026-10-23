@@ -7,8 +7,8 @@
 # The four pilot settings (and the self-reports that the self-report-conditioned
 # setting reads) already hold the first 2-3 rows of each task, so those runs are
 # extended with --skip (the pilot's --limit) into the same run dir; settings with
-# no existing run dir (a new model) run every row. The strict
-# eval prompt setting is new and runs every row. One background process per task,
+# no existing run dir (a new model) run every row. The extreme
+# alignment prompt setting is new and runs every row. One background process per task,
 # settings in order within a task (self-reports before the conditioned run).
 # Logs: outputs/logs/five_settings_<model>_<task>.log
 set -u
@@ -24,10 +24,10 @@ run_task() {
                 "honeypot1|--honeypot alignment" \
                 "alignprompt1|--prompt-wrapper prompts/alignment_eval.md" \
                 "selfreportcond1|--self-report-from selfreport1" \
-                "evalstrict1|--prompt-wrapper prompts/eval_strict.md"; do
+                "extremealign1|--prompt-wrapper prompts/extreme_alignment_eval.md"; do
         run_id=${spec%%|*}; flags=${spec#*|}
         out=outputs/${dir}_${MODEL}_${run_id}
-        skip=$pilot_rows; [ "$run_id" = evalstrict1 ] && skip=0
+        skip=$pilot_rows; [ "$run_id" = extremealign1 ] && skip=0
         # A model with no pilot run dir (e.g. gpt-5-openrouter) runs every row.
         [ -d "$out" ] || skip=0
         # run.py rewrites run.json; keep the pilot's copy.

@@ -323,6 +323,19 @@ gemini-4-argon-vertex:
     options:
       route: vertex
 
+# Gemini 3.8 Flash: same harness and route as gemini-4-argon-vertex, a smaller
+# and faster model (a direct call answers in ~3 s vs ~1 min for Argon).
+gemini-3.8-flash-vertex:
+  model: gemini-3.8-flash@default
+  api_key_env: VERTEX_SERVICE_ACCOUNT
+  generation_config:
+    reasoning_effort: high
+  harness:
+    name: gemini-cli
+    version: 0.59.0
+    options:
+      route: vertex
+
 # Judge: the CheatBench default judge (gpt-6-sol), through OpenRouter.
 gpt-6-sol-openrouter:
   model: openrouter/openai/gpt-6-sol

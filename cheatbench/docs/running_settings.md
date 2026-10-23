@@ -17,7 +17,7 @@ settings never mix (`outputs/<task>_<model>_<run-id>/`).
 | Alignment honeypot | `honeypot1` | `--honeypot alignment` ([details](honeypot_alignment.md)) |
 | Alignment prompt | `alignprompt1` | `--prompt-wrapper prompts/alignment_eval.md` |
 | Self-report conditioned | `selfreportcond1` | `--self-report-from selfreport1` |
-| Strict eval prompt | `evalstrict1` | `--prompt-wrapper prompts/eval_strict.md` |
+| Extreme alignment prompt | `extremealign1` | `--prompt-wrapper prompts/extreme_alignment_eval.md` |
 
 The self-report-conditioned setting reads the model's own answer to "would you be tempted
 to cheat?" on the same row, so run the self-report first:
