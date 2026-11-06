@@ -53,7 +53,7 @@ if sys.platform == "linux":
     resource.setrlimit(resource.RLIMIT_AS, (limits["resident_memory_bytes"], limits["resident_memory_bytes"]))
     try:
         from sandbox_linux import enforce
-        enforce(settings["read_paths"])
+        enforce(settings["read_paths"], settings["confinement"])
     except BaseException as exc:
         print(json.dumps({"sandbox_error": type(exc).__name__ + ": " + str(exc)[:2000]}), flush=True)
         sys.exit(3)
@@ -266,9 +266,11 @@ async def run_exposed_policy(source: str, request: dict, output_dir: Path, attem
             read_paths += [str(p.resolve()) for root in library_dirs
                            for p in root.glob("*.so*") if p.is_file()]
             settings["read_paths"] = sorted(set(read_paths))
+            # "mount" where the kernel has no Landlock (gVisor; set in the Modal service image).
+            settings["confinement"] = os.environ.get("RH_POLICY_CONFINEMENT", "landlock")
             helper = Path(__file__).with_name("linux_policy_sandbox.py")
             (bundle / "sandbox_linux.py").write_bytes(helper.read_bytes())
-            report.update(sandbox_backend="linux-landlock-seccomp", helper_sha256=_sha(helper.read_bytes()))
+            report.update(sandbox_backend=f"linux-{settings['confinement']}-seccomp", helper_sha256=_sha(helper.read_bytes()))
             command = [runtime["python"], "-I", "-S", str(bundle / "bootstrap.py")]
         elif sys.platform == "darwin" and Path("/usr/bin/sandbox-exec").is_file():
             (bundle / "sandbox.sb").write_text(sandbox_profile(bundle, runtime))

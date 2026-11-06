@@ -1548,8 +1548,8 @@ def run(task: dict, install: dict | None, grader=None, observer=None,
     shim = None
     allowed_tools = None
     if cfg.get("mcp_only"):
-        if route != "gateway" or grader is None:
-            error = error or "Gemini MCP-only requires a grader and the gateway route"
+        if route not in ("gateway", "vertex") or grader is None:
+            error = error or "Gemini MCP-only requires a grader and the gateway or vertex route"
         allowed_tools = ([f"mcp_{grader.grader_server_name}_{name}" for name in grader.grader_tools]
                          if grader is not None else [])
     if route == "gateway":
@@ -1577,6 +1577,7 @@ def run(task: dict, install: dict | None, grader=None, observer=None,
             api_key=api_key, model_id=cfg.get("model_id") or cfg.get("model_slug") or "",
             model_slug=cfg.get("model_slug") or "",
             exclude_tools=cfg.get("exclude_tools") or [],
+            allowed_tools=allowed_tools,
             vertex_project=cfg.get("vertex_project") or "")
         shim.start()
         env.pop(key_env, None)

@@ -2,6 +2,7 @@
 from pathlib import Path
 import hashlib
 import json
+import os
 import secrets
 import subprocess
 import sys
@@ -60,10 +61,13 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check-runtime', action='store_true')
     args = parser.parse_args()
+    host_engine = not os.environ.get('RH_NO_HOST_ENGINE')  # --sandbox modal: KataGo is not on this machine
     try:
-        check_runtime()
+        if host_engine:
+            check_runtime()
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     if not args.check_runtime:
-        ensure_assets()
+        if host_engine:
+            ensure_assets()
         build_rows()

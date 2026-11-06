@@ -7,6 +7,8 @@ timeout_s: 3600
 # The common runner builds only the selected arm and validates host-only assets too.
 build:
   args: ["--variant", "{variant}"]
+  # Not needed under --sandbox modal, where Stockfish lives in the service sandbox.
+  host_engine: [environment/stockfish/sf_19/stockfish]
   required:
     - environment/stockfish/sf_19/stockfish
     - environment/{variant}/rows.json

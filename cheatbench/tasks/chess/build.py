@@ -11,6 +11,7 @@ game core renders, so the agent reads byte-identical files."""
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import secrets
 import subprocess
@@ -126,7 +127,8 @@ def main() -> None:
     unknown = [t for t in tags if t not in block]
     if unknown:
         raise SystemExit(f"task.yaml: no such variant: {', '.join(unknown)} (have {', '.join(block)})")
-    print(f"Stockfish: verified {ensure_stockfish()}", flush=True)
+    if not os.environ.get("RH_NO_HOST_ENGINE"):
+        print(f"Stockfish: verified {ensure_stockfish()}", flush=True)
     SITE.mkdir(parents=True, exist_ok=True)
     (SITE / "manifest.json").write_text("{}\n")
     tls(SITE)

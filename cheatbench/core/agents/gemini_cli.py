@@ -316,8 +316,8 @@ class GeminiCLIAgent(InstalledAgent):
             problems.append("apply_tool_policy was never called")
             return problems
         problems += self.config_problems()
-        if self.policy.get("mcp_only") and self.route != "gateway":
-            problems.append("Gemini MCP-only requires the verified gateway route")
+        if self.policy.get("mcp_only") and self.route not in ("gateway", "vertex"):
+            problems.append("Gemini MCP-only requires the gateway or vertex route")
         effort = self.generation_config.get("reasoning_effort")
         if effort and effort not in self.REASONING_EFFORT_CHOICES:
             problems.append(f"reasoning_effort={effort!r}; gemini-cli takes "

@@ -5,6 +5,8 @@ timeout_s: 3600
 build:
   # Check GPU availability on every launch, including cached builds.
   preflight: ["--check-runtime"]
+  # Not needed under --sandbox modal, where KataGo lives in the service sandbox.
+  host_engine: [environment/assets/install.json]
   required:
     - environment/assets/install.json
     - environment/rows.json

@@ -16,22 +16,25 @@ class TaskBuildError(RuntimeError):
     pass
 
 
-def _settings(task):
+def _settings(task, host_engine=True):
     raw = load_yaml(task.root / 'task.yaml').get('build', {})
-    if not isinstance(raw, dict) or set(raw) - {'args', 'required', 'preflight'}:
-        raise TaskBuildError('task.yaml build must be a map containing only args, required, and preflight')
-    for key in ('args', 'required', 'preflight'):
+    if not isinstance(raw, dict) or set(raw) - {'args', 'required', 'preflight', 'host_engine'}:
+        raise TaskBuildError('task.yaml build must be a map containing only args, required, preflight, and host_engine')
+    for key in ('args', 'required', 'preflight', 'host_engine'):
         value = raw.get(key, [])
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise TaskBuildError(f'task.yaml build.{key} must be a list of strings')
     args = [s.replace('{variant}', task.variant) for s in raw.get('args', [])]
     required = []
     for value in raw.get('required', []):
+        # A host engine is not needed where the service runs elsewhere (--sandbox modal).
+        if not host_engine and value in raw.get('host_engine', []):
+            continue
         rel = Path(value.replace('{variant}', task.variant))
         if rel.is_absolute() or '..' in rel.parts:
             raise TaskBuildError(f'build.required must stay inside the task: {value}')
         required.append(task.root / rel)
-    preflight = [s.replace('{variant}', task.variant) for s in raw.get('preflight', [])]
+    preflight = [s.replace('{variant}', task.variant) for s in raw.get('preflight', [])] if host_engine else []
     return args, required, preflight
 
 
@@ -74,9 +77,14 @@ def _inspect(task, required):
     return sorted(set(missing)), rows
 
 
-def ensure_task_built(task, *, auto_build=True, rebuild=False):
-    """One build per task at a time; recheck under the lock after another launch."""
-    args, required, preflight = _settings(task)
+def ensure_task_built(task, *, auto_build=True, rebuild=False, host_engine=True):
+    """One build per task at a time; recheck under the lock after another launch.
+
+    `host_engine=False` (--sandbox modal): the task's engine runs in a service sandbox
+    (core/sandbox/modal_runtime.py), so the build skips installing and verifying it here,
+    which would fail on a laptop. The build script sees RH_NO_HOST_ENGINE=1.
+    """
+    args, required, preflight = _settings(task, host_engine)
     builder = task.root / 'build.py'
     command = [sys.executable, '-u', str(builder), *args]
     label = task.name + (f'/{task.variant}' if task.variant else '')
@@ -106,6 +114,8 @@ def ensure_task_built(task, *, auto_build=True, rebuild=False):
             print(f'task build: {label}: {reason}', flush=True)
             print(f'task build: running {shlex.join(command)}', flush=True)
             env = os.environ.copy()
+            if not host_engine:
+                env['RH_NO_HOST_ENGINE'] = '1'
             if sys.version_info[:2] == (3, 11):
                 env.setdefault('RH_PY311', sys.executable)
             try:

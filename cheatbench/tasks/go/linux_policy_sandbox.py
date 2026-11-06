@@ -5,6 +5,13 @@ A default-deny libseccomp filter covers ABI 1's gaps (notably truncate/chmod),
 all networking, child processes, exec, ptrace, namespaces and newer syscall APIs.
 Filesystem metadata queries remain available to Python's import machinery.
 No Python-level restriction is relied on as a security boundary.
+
+gVisor (Modal's GPU runtime) has no Landlock. With confinement="mount" the same
+read_paths are bind-mounted into an otherwise empty private tree and the worker
+chroots into it, in new user, mount and network namespaces. Everything else is
+then absent rather than denied. The seccomp filter below is unchanged, and it
+is what stops the worker undoing this (mount, chroot and unshare stay denied)
+or writing through the bind mounts.
 """
 from __future__ import annotations
 
@@ -29,7 +36,29 @@ class Comparison(ctypes.Structure):
                 ('datum_a', ctypes.c_uint64), ('datum_b', ctypes.c_uint64)]
 
 
-def enforce(read_paths: list[str]) -> dict:
+def _private_mount_tree(libc, read_paths: list[str], root: str = '/mnt') -> None:
+    CLONE_NEWNS, CLONE_NEWUSER, CLONE_NEWNET = 0x00020000, 0x10000000, 0x40000000
+    MS_BIND, MS_REC, MS_PRIVATE = 4096, 16384, 1 << 18
+    if libc.unshare(CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWNET):
+        raise OSError(ctypes.get_errno(), 'unshare failed')
+    def mount(source, target, kind, flags):
+        if libc.mount(source and source.encode(), target.encode(), kind and kind.encode(), flags, None):
+            raise OSError(ctypes.get_errno(), f'mount {source} {target}')
+    mount(None, '/', None, MS_REC | MS_PRIVATE)
+    mount('tmpfs', root, 'tmpfs', 0)
+    for name in read_paths:
+        target = root + name
+        if os.path.isdir(name):
+            os.makedirs(target, exist_ok=True)
+        else:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            os.close(os.open(target, os.O_CREAT | os.O_WRONLY))
+        mount(name, target, None, MS_BIND | MS_REC)
+    os.chroot(root)
+    os.chdir('/')
+
+
+def enforce(read_paths: list[str], confinement: str = 'landlock') -> dict:
     if platform.machine() not in ('x86_64', 'aarch64'):
         raise RuntimeError('Unsupported Linux architecture; no unsandboxed fallback')
     libc = ctypes.CDLL(None, use_errno=True)
@@ -47,31 +76,36 @@ def enforce(read_paths: list[str]) -> dict:
                                          ctypes.c_int, ctypes.c_uint, ctypes.POINTER(Comparison)]
     sec.seccomp_load.argtypes = [ctypes.c_void_p]
     sec.seccomp_release.argtypes = [ctypes.c_void_p]
-    abi = libc.syscall(444, 0, 0, 1)
-    if abi < 1:
-        raise RuntimeError(f'Landlock unavailable (errno={ctypes.get_errno()}); no fallback')
+    abi = None
+    if confinement == 'mount':
+        _private_mount_tree(libc, read_paths)
+    else:
+        abi = libc.syscall(444, 0, 0, 1)
+        if abi < 1:
+            raise RuntimeError(f'Landlock unavailable (errno={ctypes.get_errno()}); no fallback')
     if libc.prctl(38, 1, 0, 0, 0):  # PR_SET_NO_NEW_PRIVS
         raise OSError(ctypes.get_errno(), 'PR_SET_NO_NEW_PRIVS failed')
-    # ABI 1 supports exactly these thirteen rights, all denied unless granted.
-    attrs = Ruleset((1 << 13) - 1)
-    fd = libc.syscall(444, ctypes.byref(attrs), ctypes.sizeof(attrs), 0)
-    if fd < 0:
-        raise OSError(ctypes.get_errno(), 'Landlock ruleset creation failed')
-    try:
-        for name in read_paths:
-            path = Path(name)
-            allowed = (1 << 2) | ((1 << 3) if path.is_dir() else 0)  # read file/dir
-            path_fd = os.open(path, os.O_PATH | os.O_CLOEXEC)
-            try:
-                rule = PathRule(allowed, path_fd)
-                if libc.syscall(445, fd, 1, ctypes.byref(rule), 0):
-                    raise OSError(ctypes.get_errno(), 'Landlock rule insertion failed')
-            finally:
-                os.close(path_fd)
-        if libc.syscall(446, fd, 0):
-            raise OSError(ctypes.get_errno(), 'Landlock restriction failed')
-    finally:
-        os.close(fd)
+    if confinement != 'mount':
+        # ABI 1 supports exactly these thirteen rights, all denied unless granted.
+        attrs = Ruleset((1 << 13) - 1)
+        fd = libc.syscall(444, ctypes.byref(attrs), ctypes.sizeof(attrs), 0)
+        if fd < 0:
+            raise OSError(ctypes.get_errno(), 'Landlock ruleset creation failed')
+        try:
+            for name in read_paths:
+                path = Path(name)
+                allowed = (1 << 2) | ((1 << 3) if path.is_dir() else 0)  # read file/dir
+                path_fd = os.open(path, os.O_PATH | os.O_CLOEXEC)
+                try:
+                    rule = PathRule(allowed, path_fd)
+                    if libc.syscall(445, fd, 1, ctypes.byref(rule), 0):
+                        raise OSError(ctypes.get_errno(), 'Landlock rule insertion failed')
+                finally:
+                    os.close(path_fd)
+            if libc.syscall(446, fd, 0):
+                raise OSError(ctypes.get_errno(), 'Landlock restriction failed')
+        finally:
+            os.close(fd)
 
     ctx = sec.seccomp_init(0x00050000 | errno.EPERM)  # SCMP_ACT_ERRNO
     if not ctx:
@@ -113,4 +147,4 @@ def enforce(read_paths: list[str]) -> dict:
             raise RuntimeError(f'seccomp_load failed: {code}')
     finally:
         sec.seccomp_release(ctx)
-    return {'backend': 'linux-landlock-seccomp', 'landlock_abi': abi}
+    return {'backend': f'linux-{confinement}-seccomp', 'landlock_abi': abi}

@@ -99,7 +99,9 @@ class Handler(BaseHTTPRequestHandler):
     def forward(self, paths):
         # Compare the entire target, including Claude's fixed beta query.
         # Other query strings, absolute URLs and traversal are not normalized.
-        if self.path not in paths or self.headers.get("Upgrade") or self.headers.get("Transfer-Encoding"):
+        # OpenRouter's API lives under /api/v1 rather than /v1.
+        path = self.path.removeprefix("/api") if self.server.path_prefix == "/api/v1" else self.path
+        if path not in paths or self.headers.get("Upgrade") or self.headers.get("Transfer-Encoding"):
             return self.reject()
         lengths = self.headers.get_all("Content-Length") or []
         try:
@@ -162,16 +164,17 @@ class Handler(BaseHTTPRequestHandler):
 class InferenceBridge(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, base_url, api_key, log_path, *, keepalive_interval=15, grok_mcp=False, mcp_server="chess"):
+    def __init__(self, base_url, api_key, log_path, *, keepalive_interval=15, grok_mcp=False, mcp_server="chess",
+                 bind=("127.0.0.1", 0)):
         if mcp_server not in {"chess", "go"}:
             raise ValueError("Unsupported restricted game namespace")
         if keepalive_interval <= 0:
             raise ValueError("keepalive_interval must be positive")
         parsed = urlsplit(base_url)
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
-                or parsed.query or parsed.fragment or parsed.path.rstrip("/") not in ("", "/v1")):
-            raise ValueError("Restricted native inference requires an HTTPS model origin, optionally ending in /v1")
-        super().__init__(("127.0.0.1", 0), Handler)
+                or parsed.query or parsed.fragment or parsed.path.rstrip("/") not in ("", "/v1", "/api/v1")):
+            raise ValueError("Restricted native inference requires an HTTPS model origin, optionally ending in /v1 or /api/v1")
+        super().__init__(tuple(bind), Handler)
         self.upstream = Upstream(base_url, api_key, timeout=900)
         self.keepalive_interval = keepalive_interval
         self.grok_mcp = bool(grok_mcp)

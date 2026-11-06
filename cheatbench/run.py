@@ -239,7 +239,8 @@ async def main_async(args: argparse.Namespace) -> int:
     try:
         rows, build_record = task_build.ensure_task_built(
             task,
-            auto_build=not args.no_auto_build, rebuild=args.rebuild_task)
+            auto_build=not args.no_auto_build, rebuild=args.rebuild_task,
+            host_engine=args.sandbox != "modal")
     except task_build.TaskBuildError as exc:
         raise SystemExit(str(exc)) from exc
     if args.honeypot:
@@ -306,12 +307,16 @@ async def main_async(args: argparse.Namespace) -> int:
     if args.sandbox == "modal":
         # Modal runs the same one-command episode, but nothing can reach into a
         # live Modal sandbox from the host, and host loopback services are not
-        # reachable from it. Tasks that need either are refused (see CLAUDE.md).
+        # reachable from it. chess and go move their host side into a second
+        # sandbox (modal_runtime.ModalServiceHost); other tasks that need the host
+        # are refused (see CLAUDE.md).
+        from core.sandbox.modal_runtime import SERVICE_SPECS
+        hosted = task.name in SERVICE_SPECS
         unsupported = [why for cond, why in (
-            (task.setup_hook.exists(), f"setup hook {task.setup_hook.name}"),
+            (task.setup_hook.exists() and not hosted, f"setup hook {task.setup_hook.name}"),
             (task.review is not None, "host review endpoint (`grader:` judge)"),
             (task.service is not None, "host `service:`"),
-            (task.tools.get("mcp_only"), "mcp_only inference bridge")) if cond]
+            (task.tools.get("mcp_only") and not hosted, "mcp_only inference bridge")) if cond]
         if unsupported:
             raise SystemExit(f"--sandbox modal cannot run {task.name}: needs "
                              + ", ".join(unsupported))
@@ -329,6 +334,7 @@ async def main_async(args: argparse.Namespace) -> int:
     # default. A missing image is not an error -- the sandbox builds it from the
     # task Dockerfile (or the repo default). Doing it here rather than only in run_trial means one
     # build before the progress bar instead of a first episode that looks hung.
+    service_image = None
     if args.sandbox == "modal":
         from core.sandbox import modal_runtime
         install = agent.install()
@@ -336,6 +342,8 @@ async def main_async(args: argparse.Namespace) -> int:
             task.image_dockerfile or sandbox.DOCKERFILE,
             prebake=install["install"] if install else ""))
         image_record = f"modal:{image.object_id}"
+        service_image = (await modal_runtime.build_image(modal_runtime.service_image(task.name, ROOT))
+                         if task.name in modal_runtime.SERVICE_SPECS else None)
     else:
         image = args.image or sandbox.resolve_image(task.image)
         await sandbox.ensure_image_async(image, rebuild=args.rebuild_image,
@@ -513,7 +521,7 @@ async def main_async(args: argparse.Namespace) -> int:
                         timeout_s=args.timeout or None, replicate=replicate,
                         review=review_config,
                         service_health=getattr(active_service, "check_health", None),
-                        backend=args.sandbox,
+                        backend=args.sandbox, service_image=service_image,
                         self_report=ROOT / args.probe if args.probe else SELF_REPORT_PROMPT if args.self_report else None,
                         prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None,
                         prior_self_report=prior_answers[row["id"]] if prior_answers else None,

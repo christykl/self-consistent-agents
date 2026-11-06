@@ -33,6 +33,8 @@ import urllib.request
 
 def _service_failure(exc):
     """Invalidate the episode through the host's existing fatal-error channel."""
+    # What the name resolved against, for diagnosing the failure afterwards.
+    print("[grader] /etc/hosts at failure: " + repr(open("/etc/hosts").read()), file=sys.stderr, flush=True)
     print("\x1eRHGRADER_FATAL " + json.dumps({
         "error": f"Chess service connection failed: {type(exc).__name__}: {exc}"
     }), file=sys.stderr, flush=True)

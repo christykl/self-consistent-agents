@@ -19,7 +19,7 @@ def test_valid_edited_policy_and_stdlib_import_work(tmp_path):
     result = run(tmp_path, 'import math\ndef decide(state):\n    return {"move": state["move"] if math.sqrt(4) == 2 else "A1"}\n', {'move': 'F8'})
     assert result['status'] == 'completed', result
     assert result['move'] == 'F8' and result['resign'] is False
-    assert result['sandbox_backend'] == 'linux-landlock-seccomp'
+    assert result['sandbox_backend'] in ('linux-landlock-seccomp', 'linux-mount-seccomp')
 
 
 def test_policy_can_resign(tmp_path):
@@ -37,7 +37,7 @@ def decide(state):
     for path in state['paths']:
         try:
             open(path).read()
-        except PermissionError:
+        except (PermissionError, FileNotFoundError):  # absent under the mount-tree confinement
             continue
         raise RuntimeError('unexpected host read')
     return {'resign': True}
@@ -92,7 +92,7 @@ def test_unavailable_boundary_never_imports_the_policy(tmp_path, monkeypatch):
     original = Path.read_bytes
     def helper_bytes(path):
         if path.name == 'linux_policy_sandbox.py':
-            return b'def enforce(paths):\n    raise RuntimeError("boundary unavailable")\n'
+            return b'def enforce(paths, confinement):\n    raise RuntimeError("boundary unavailable")\n'
         return original(path)
     monkeypatch.setattr(Path, 'read_bytes', helper_bytes)
     result = run(tmp_path, 'raise RuntimeError("POLICY MUST NOT RUN")\n')

@@ -117,7 +117,7 @@ class Task:
             if self.name not in {"chess", "go"} or not self.network.denies:
                 raise SystemExit("MCP-only execution requires network-denied chess or Go")
             supported = agent.name() in {"claude-sdk", "codex", "deepseek-harness", "grok-build", "kimi-code", "terminus-2", "muse-code"}
-            supported |= agent.name() == "gemini-cli" and agent.route == "gateway"
+            supported |= agent.name() == "gemini-cli" and agent.route in ("gateway", "vertex")
             if not supported:
                 raise SystemExit("This adapter cannot enforce the native game MCP-only condition")
 
@@ -436,6 +436,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     env: dict | None = None, timeout_s: int | None = None,
                     replicate: int = 1, review: dict | None = None,
                     service_health=None, backend: str = "enroot",
+                    service_image=None,
                     self_report: Path | None = None,
                     prompt_wrapper: Path | None = None,
                     prior_self_report: dict | None = None,
@@ -579,6 +580,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
 
     private_net = task.private_net
     home_dir = tempfile.mkdtemp(prefix="rh_home_")
+    sb = None
 
     try:
         # The credential's VARIABLE NAME comes from the adapter: Claude's
@@ -590,11 +592,27 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         # entry's `api_key_env:` named may differ from what the CLI reads.
         if backend == "modal":
             # Same payload and stdin protocol; Modal's allowlist stands in for
-            # the egress firewall below. Setup hooks are refused in run.py.
+            # the egress firewall below. run.py refuses hooks ModalServiceHost
+            # cannot host. The hook runs BEFORE the agent sandbox exists, because
+            # Modal fixes a sandbox's allowlist at creation and it must name the
+            # service's tunnels.
             from .sandbox import modal_runtime
             allow = (sandbox.hosts_for(task.network, agent.resolved_base_url(),
                                        agent.INSTALL_HOSTS)
                      if task.network.enforced else None)
+            if task.setup_hook.exists():
+                sb = modal_runtime.ModalServiceHost(
+                    service_image, task.name, task.root.parents[1],
+                    timeout_s + CONTAINER_GRACE_S + MODAL_SANDBOX_SLACK_S, trial_dir)
+                await asyncio.to_thread(run_setup_hook, task, row, sb)
+                # The Vertex route's model traffic is Google-native and its token
+                # lives in the agent sandbox, so it does not pass through the bridge;
+                # its relay in the runner holds the MCP-only policy instead: a tool
+                # declared outside the game's nine fails the episode.
+                if task.tools.get("mcp_only") and getattr(agent, "route", None) != "vertex":
+                    blob, _ = await asyncio.to_thread(
+                        sb.route_mcp_only, blob, agent.resolved_base_url(), api_key)
+                allow = (*allow, *sb.tunnel_hosts)
             proc = await modal_runtime.start_episode(
                 image, agent.bootstrap,
                 secrets={name: api_key for name in agent.container_key_envs()},
@@ -603,7 +621,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                 # Modal shuts it down before the result line arrives. close()
                 # terminates it after every episode, so the slack costs nothing.
                 timeout_s=timeout_s + CONTAINER_GRACE_S + MODAL_SANDBOX_SLACK_S,
-                allow_hosts=allow)
+                allow_hosts=allow, before_payload=sb.attach if sb is not None else None)
             # A credential that expires mid-episode (Vertex tokens, 1 h) is
             # written into the sandbox now and rewritten while it runs.
             if getattr(agent, "token_refresh", lambda: None)():
@@ -633,7 +651,6 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     # INJECTED: the task's setup hook runs BEFORE the episode does. The
     # container is already running but blocked reading its task from stdin, so
     # this window is free: nothing inside can touch the network until we feed it.
-    sb = None
     guard = None
     if proc is not None and private_net and backend == "enroot":
         sb = sandbox.EpisodeSandbox(proc.pid, ("python", "-c", agent.bootstrap),
@@ -794,7 +811,10 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     if sb is not None:
         # Everything the hook started dies with the episode: the namespace it
         # lives in is gone anyway once the container exits.
-        sb.close()
+        if backend == "modal":
+            await asyncio.to_thread(sb.close)
+        else:
+            sb.close()
     if backend == "modal" and proc is not None:
         await proc.close()
     shutil.rmtree(home_dir, ignore_errors=True)
