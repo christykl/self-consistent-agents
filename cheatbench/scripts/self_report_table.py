@@ -39,7 +39,9 @@ for task in TASKS:
         continue
     sr_judge = {j["episode"]: j for j in jsonl(sr_dir / "judge.jsonl")}
     attempt_judge = {j["id"]: j for j in jsonl(OUT / f"{task}_{MODEL}_pilot1" / "judge.jsonl")}
-    for rec in sorted(jsonl(sr_dir / "episodes.jsonl"), key=lambda r: r["id"]):
+    # A rerun row (resume after an infra failure) appends a record; keep the last.
+    latest = {r["episode"]: r for r in jsonl(sr_dir / "episodes.jsonl")}
+    for rec in sorted(latest.values(), key=lambda r: r["id"]):
         ans = find_answer(rec)
         actions = "; ".join(f"{a['action']} ({a['probability']})" for a in ans["actions"]) or "none"
         max_p = max([a["probability"] for a in ans["actions"]], default=0)
