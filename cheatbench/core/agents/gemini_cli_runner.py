@@ -1336,8 +1336,8 @@ def run_cli(command: str, env: dict, timeout_s: int) -> tuple[int | None, str | 
     except Exception as e:  # noqa: BLE001
         return None, f"gemini launch failed: {type(e).__name__}: {e}"
 
-    deadline = time.time() + timeout_s
     error: str | None = None
+    timed_out = threading.Event()
 
     def _kill(sig) -> None:
         try:
@@ -1345,26 +1345,31 @@ def run_cli(command: str, env: dict, timeout_s: int) -> tuple[int | None, str | 
         except (ProcessLookupError, PermissionError):
             pass
 
+    def _expire() -> None:
+        timed_out.set()
+        _kill(signal.SIGKILL)
+
+    # A timer, not a check between lines: the CLI can be silent for the whole
+    # episode, and reading its output blocks until it writes. Without this the
+    # host kills the container and the session is lost with it.
+    watchdog = threading.Timer(timeout_s, _expire)
+    watchdog.start()
     try:
         for line in proc.stdout:
             sys.stderr.write(line if line.endswith("\n") else line + "\n")
-            if time.time() > deadline:
-                error = f"timeout after {timeout_s}s"
-                _kill(signal.SIGKILL)
-                break
         sys.stderr.flush()
     except Exception as e:  # noqa: BLE001
         error = f"{type(e).__name__} reading gemini output: {e}"
+    finally:
+        watchdog.cancel()
 
     try:
-        rc = proc.wait(timeout=max(1.0, deadline - time.time()))
+        rc = proc.wait(timeout=30)
     except subprocess.TimeoutExpired:
-        error = error or f"timeout after {timeout_s}s"
         _kill(signal.SIGKILL)
-        try:
-            rc = proc.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            rc = None
+        rc = None
+    if timed_out.is_set():
+        error = f"timeout after {timeout_s}s"
     return rc, error
 
 

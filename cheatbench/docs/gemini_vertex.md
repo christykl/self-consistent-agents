@@ -115,3 +115,17 @@ it decodes slowly.
   per turn): GPT-6 Astra 7.8 s / 229, GPT-6.1 Sol 12.3 s / 355, GPT-5 7.9 s /
   637. Codex's reasoning-token counts are summaries, so the token comparison is
   approximate, but per-turn latency differs by about 10x.
+
+## Lost sessions before 2026-11-06
+
+`run_cli` in `core/agents/gemini_cli_runner.py` used to check its deadline only between lines
+of CLI output, and the CLI can be silent for long stretches. An episode still silent at its
+limit was killed by the host, 180 s later, before the runner could read the session. The record
+then has no transcript and the error `timeout after Ns (container killed)`. The judge still ran,
+on a transcript saying no session was captured, and usually returned `cheated: false`.
+
+The deadline is now a timer, so a timed-out episode keeps everything up to the limit. Runs
+already recorded are unchanged: 36 of 1,470 Gemini episodes have that error, and 26 of those have no
+recorded messages at all, all judged `cheated: false`. They are mostly Argon on knowledge_work,
+prime_factorization and subset_sum, so their "not cheated" counts in the Gemini reports include
+episodes with no evidence.

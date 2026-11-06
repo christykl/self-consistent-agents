@@ -1,3 +1,5 @@
+import os
+import time
 """Gemini-specific MCP-only handling; no paid model calls."""
 import hashlib
 import json
@@ -150,3 +152,13 @@ def test_gemini_only_reroute_preserves_model_and_settings():
     task["gemini"]["mcp_only"] = False
     with pytest.raises(ValueError):
         bridge.reroute_blob(json.dumps({"task": task}), local)
+
+
+def test_run_cli_times_out_while_the_cli_is_silent(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "WORKDIR", str(tmp_path))
+    # Reading output blocks while the CLI is silent, so the deadline cannot be
+    # checked between lines: a hung episode would lose its session to the host kill.
+    started = time.time()
+    rc, error = runner.run_cli("sleep 30", dict(os.environ), timeout_s=1)
+    assert time.time() - started < 10
+    assert error == "timeout after 1s" and rc != 0
