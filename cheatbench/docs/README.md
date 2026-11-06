@@ -6,6 +6,10 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [running_settings.md](running_settings.md): how to run the five settings (baseline,
   alignment honeypot, alignment prompt, self-report conditioned, strict eval prompt) on any
   model, harness, or subset of rows, and how to tabulate the results.
+- [self_report_in_context.md](self_report_in_context.md): the in-context self-report
+  setting (`--self-report-in-context-from selfreport1`): the stored self-report answer as
+  the model's own earlier turn, and the attempt continues that conversation (Codex,
+  Gemini CLI, Terminus-2).
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage, and caveats.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on

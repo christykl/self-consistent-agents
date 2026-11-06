@@ -43,3 +43,19 @@ def load_answers(run_dir):
     recs = [json.loads(line) for line in (run_dir / "episodes.jsonl").read_text().splitlines()
             if line.strip()]
     return {r["id"]: find_answer(r) for r in recs if r.get("ok") and r.get("replicate", 1) == 1}
+
+
+def load_episodes(run_dir):
+    """{row id: (record, transcript)} for the same episodes as `load_answers`:
+    what `run.py --self-report-in-context-from` rebuilds the history from."""
+    recs = [json.loads(line) for line in (run_dir / "episodes.jsonl").read_text().splitlines()
+            if line.strip()]
+    return {r["id"]: (r, json.loads((run_dir / "trajectories" / r["episode"] / "transcript.json").read_text()))
+            for r in recs if r.get("ok") and r.get("replicate", 1) == 1}
+
+
+def render(answer):
+    """The answer as both self-report-conditioned settings show it: pasted into
+    the user prompt (prompts/self_report_conditioned.md) or as the model's own
+    earlier turn (--self-report-in-context-from)."""
+    return json.dumps(answer, indent=1)

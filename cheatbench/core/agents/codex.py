@@ -439,6 +439,40 @@ class CodexAgent(InstalledAgent):
         return problems
 
     # ---- the episode ------------------------------------------------------
+    def resume_state(self, record: dict, transcript: dict, reply: str) -> dict:
+        """A Codex session to continue (`codex exec resume`), rebuilt from an
+        earlier self-report episode as [its user prompt, `reply`]: the rollout
+        events and the path and session id the runner restores them under.
+
+        Kept from the episode: every event before the model's first output
+        (session header, developer/environment context, the user prompt).
+        Then its last assistant message and `task_complete` event, with the
+        text replaced by `reply`. Dropped: reasoning (including encrypted
+        reasoning), tool calls and their outputs, other assistant messages,
+        token counts, UI events."""
+        events = transcript["messages"]
+
+        def is_output(ev):
+            p = ev.get("payload") or {}
+            return ev.get("type") == "response_item" and not (
+                p.get("type") == "message" and p.get("role") in ("developer", "user"))
+
+        first = next(i for i, ev in enumerate(events) if is_output(ev))
+        prompt = [ev for ev in events[:first]
+                  if not (ev.get("type") == "event_msg"
+                          and (ev.get("payload") or {}).get("type") == "item_completed")]
+        final = [ev for ev in events if ev.get("type") == "response_item"
+                 and ev["payload"].get("type") == "message"
+                 and ev["payload"].get("role") == "assistant"][-1]
+        done = [ev for ev in events if ev.get("type") == "event_msg"
+                and ev["payload"].get("type") == "task_complete"][-1]
+        final = dict(final, payload=dict(final["payload"],
+                                         content=[{"type": "output_text", "text": reply}]))
+        done = dict(done, payload=dict(done["payload"], last_agent_message=reply))
+        return {"rollout_path": record["rollout_path"],
+                "session_id": record["session_id"],
+                "events": prompt + [final, done]}
+
     def blob(self, *, row: dict, prompt, files: list, skip_dirs: tuple,
              grader_src: str = "", stage_src: str, timeout_s: int,
              env: dict, install: dict | None = None,

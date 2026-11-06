@@ -1308,16 +1308,20 @@ def write_settings(gemini_dir: str, settings: dict) -> str:
     return path
 
 
-def compose_command(cfg: dict, instruction: str, logfile: str) -> str:
+def compose_command(cfg: dict, instruction: str, logfile: str,
+                    resume: bool = False) -> str:
     """Harbor's `gemini` command line:
 
         gemini --yolo --model=<slug-or-alias> --prompt=<instruction>
                2>&1 </dev/null | tee <log>
 
     stdin is closed so the CLI can never wait on a terminal, and the prompt is
-    argv, as Harbor passes it.
+    argv, as Harbor passes it. With `resume`, `--resume latest` continues the
+    session file restored under ~/.gemini/tmp, and the instruction becomes its
+    next user turn.
     """
     parts = ["gemini", "--yolo", f"--model={shlex.quote(cfg['run_model'])}",
+             *(["--resume", "latest"] if resume else []),
              f"--prompt={shlex.quote(instruction)}"]
     return ("if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
             + " ".join(parts)
@@ -1591,8 +1595,21 @@ def run(task: dict, install: dict | None, grader=None, observer=None,
     except Exception as e:  # noqa: BLE001
         error = error or f"settings.json setup failed: {type(e).__name__}: {e}"
 
+    # IN-CONTEXT CONTINUATION (run.py --self-report-in-context-from): a session
+    # file rebuilt on the host from an earlier self-report episode as [its user
+    # prompt, the answer] (gemini_cli.py `resume_state`) is written where the CLI
+    # wrote that episode's session (same home, same /workspace project), then
+    # resumed.
+    resume = task.get("resume")
+    if resume:
+        os.makedirs(os.path.dirname(resume["session_path"]), exist_ok=True)
+        with open(resume["session_path"], "w") as f:
+            f.writelines(json.dumps(rec) + "\n" for rec in resume["records"])
+        _log(f"restored session {resume['session_path']} ({len(resume['records'])} records)")
+
     logfile = os.path.join(home, "gemini-cli.txt")
-    command = compose_command(cfg, task["content"], logfile)
+    command = compose_command(cfg, task["content"], logfile,
+                              **({"resume": True} if resume else {}))
     _log(f"gemini command: {command}")
 
     t0 = time.time()
@@ -1629,6 +1646,11 @@ def run(task: dict, install: dict | None, grader=None, observer=None,
         _emit_msg(rec)
 
     info = summarise(records)
+    if resume:
+        # The resumed session file starts with the restored prompt and answer:
+        # report this session's turns, tool calls and tokens only.
+        info = {**summarise(records[len(resume["records"]):]),
+                "session_id": info["session_id"]}
     error = error or episode_error(rc, info, shim.calls if shim is not None else None)
     if error is None and shim is not None and shim.breaches:
         # A closed tool that was declared to the model ran outside the

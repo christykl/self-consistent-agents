@@ -53,6 +53,7 @@ class Terminus2Agent(InstalledAgent):
     EXTRA_RECORD_KEYS = (
         "harbor_commit",
         "harbor_trajectory",
+        "harbor_prior_trajectory",
         "harbor_artifacts",
         "harbor_context",
         "harbor_options",
@@ -177,6 +178,26 @@ class Terminus2Agent(InstalledAgent):
             ]
         )
 
+    def resume_state(self, record, transcript, reply):
+        """A Terminus-2 conversation to continue, rebuilt from an earlier
+        self-report episode as [its user prompt, `reply`]: the chat history
+        (prepended to the next run's chat) and the matching two trajectory
+        steps (prepended to the next run's trajectory).
+
+        The user prompt is the episode's first trajectory step, which is
+        Harbor's first chat message verbatim (Harbor-wrapped task prompt and
+        initial terminal state). Dropped: every command batch, terminal output
+        and reply. (Harbor never sends reasoning back here:
+        `interleaved_thinking` is off.)"""
+        trajectory = self.to_trajectory(transcript).to_json_dict()
+        steps = trajectory["steps"]
+        last = [s for s in steps if s["source"] == "agent"][-1]
+        agent_step = {"step_id": 2, "timestamp": last["timestamp"], "source": "agent",
+                      "model_name": last.get("model_name"), "message": reply}
+        return {"chat": [{"role": "user", "content": steps[0]["message"]},
+                         {"role": "assistant", "content": reply}],
+                "trajectory": dict(trajectory, steps=[steps[0], agent_step])}
+
     def blob(
         self,
         *,
@@ -238,18 +259,20 @@ class Terminus2Agent(InstalledAgent):
         ).encode()
 
     def to_trajectory(self, raw):
-        native = raw.get("harbor_trajectory")
-        if not native:
-            # The common historical transcript stores only native `messages`,
-            # so the complete Harbor document travels there in an envelope.
-            native = next(
-                (
-                    m["trajectory"]
-                    for m in raw.get("messages") or []
-                    if m.get("type") == "harbor_trajectory"
-                ),
-                None,
-            )
+        # The common historical transcript stores only native `messages`,
+        # so the complete Harbor document travels there in an envelope.
+        envelope = next(
+            (m for m in raw.get("messages") or [] if m.get("type") == "harbor_trajectory"),
+            {},
+        )
+        native = raw.get("harbor_trajectory") or envelope.get("trajectory")
+        # A continued session (run.py --self-report-in-context-from) also carries
+        # the restored history's two steps; the conversation is both, in order.
+        prior = raw.get("harbor_prior_trajectory") or envelope.get("prior_trajectory")
+        if native and prior:
+            steps = [dict(s, step_id=i) for i, s in
+                     enumerate(prior["steps"] + native["steps"], 1)]
+            return Trajectory.model_validate(dict(native, steps=steps))
         if native:
             return Trajectory.model_validate(native)
         if raw.get("messages"):

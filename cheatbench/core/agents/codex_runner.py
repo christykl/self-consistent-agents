@@ -667,7 +667,8 @@ def prepare_home(cfg: dict, api_key: str, grader_url: str = "",
              f", mcp_servers={grader_name if grader_url else 'none'})")
 
 
-def compose_command(cfg: dict, instruction: str, logfile: str) -> str:
+def compose_command(cfg: dict, instruction: str, logfile: str,
+                    resume_id: str | None = None) -> str:
     """Harbor's `codex exec` command line, plus this eval's closed-book flags.
 
         codex exec --dangerously-bypass-approvals-and-sandbox
@@ -679,18 +680,19 @@ def compose_command(cfg: dict, instruction: str, logfile: str) -> str:
                    -- <shlex-quoted instruction> 2>&1 </dev/null | tee <log>
 
     Every flag is chosen by the adapter (core/agents/codex.py); this function only
-    orders them. The instruction is ARGV, not stdin, and stdin is closed: Codex
+    orders them. With `resume_id` it is `codex exec resume ... -- <id> <prompt>`
+    instead: the instruction becomes the next user turn of that session. The instruction is ARGV, not stdin, and stdin is closed: Codex
     reads a prompt from stdin when it is not given one, and a `codex exec` still
     waiting on a terminal is an episode that hangs to the timeout.
     """
-    parts = ["codex", "exec", *cfg["exec_flags"],
+    parts = ["codex", "exec", *(["resume"] if resume_id else []), *cfg["exec_flags"],
              "--model", cfg["model_slug"], "--json"]
     for feature in cfg.get("enable") or []:
         parts += ["--enable", feature]
     for feature in cfg.get("disable") or []:
         parts += ["--disable", feature]
     parts += list(cfg.get("cli_flags") or [])
-    parts += ["--", instruction]
+    parts += ["--", *([resume_id] if resume_id else []), instruction]
     # `if [ -s ~/.nvm/nvm.sh ]` first, exactly as Harbor does: the binary may
     # only exist on nvm's PATH.
     return ("set -o pipefail; if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
@@ -966,8 +968,21 @@ def run(task: dict, install: dict | None, grader=None,
     except Exception as e:  # noqa: BLE001
         error = error or f"codex home setup failed: {type(e).__name__}: {e}"
 
+    # IN-CONTEXT CONTINUATION (run.py --self-report-in-context-from): a rollout
+    # rebuilt on the host from an earlier self-report episode as [its user
+    # prompt, the answer] (codex.py `resume_state`) is written where Codex wrote
+    # that episode's rollout, and `codex exec resume` continues it.
+    resume = task.get("resume")
+    if resume:
+        os.makedirs(os.path.dirname(resume["rollout_path"]), exist_ok=True)
+        with open(resume["rollout_path"], "w") as f:
+            f.writelines(json.dumps(ev) + "\n" for ev in resume["events"])
+        _log(f"restored rollout {resume['rollout_path']} "
+             f"({len(resume['events'])} events) for session {resume['session_id']}")
+
     logfile = os.path.join(cfg["codex_home"], "codex.txt")
-    command = compose_command(cfg, task["content"], logfile)
+    command = compose_command(cfg, task["content"], logfile,
+                              **({"resume_id": resume["session_id"]} if resume else {}))
     _log(f"codex command: {command}")
 
     t0 = time.time()
@@ -1015,6 +1030,11 @@ def run(task: dict, install: dict | None, grader=None,
         _emit_msg(ev)
 
     info = summarise(events)
+    if resume:
+        # The resumed rollout starts with the restored prompt and answer (no
+        # token counts or tool calls): report this session's events only.
+        info = {**summarise(events[len(resume["events"]):]),
+                "session_id": info["session_id"]}
     if error is None and info["terminal_error"]:
         # The turn failed but `codex exec` still exited 0. THE case this exists
         # for: our gateway answers `400 ... Budget has been exceeded` once the

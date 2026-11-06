@@ -201,6 +201,7 @@ async def episode(task, logs_dir, grader, observer):
     agent.options.llm_kwargs = {}
     agent.observer = observer
     agent.raw_responses = []
+    agent.prior_messages = (task.get("resume") or {}).get("chat") or []
     from harbor.models.trial.paths import EnvironmentPaths
 
     Path(EnvironmentPaths.agent_dir).mkdir(parents=True, exist_ok=True)
@@ -241,6 +242,10 @@ def run(task, install, grader=None, observer=None, observer_ns=None):
         logs_dir = Path(path)
         context, options, error, raw_responses = asyncio.run(
             episode(task, logs_dir, grader, observer))
+        # A continued session's trajectory covers only this run; the restored
+        # history's steps travel with it so the transcript is the whole
+        # conversation (terminus_2.py `to_trajectory` prepends them).
+        prior_trajectory = (task.get("resume") or {}).get("trajectory")
         artifacts = {
             p.name: json.loads(p.read_text()) for p in logs_dir.glob("trajectory*.json")
         }
@@ -266,6 +271,7 @@ def run(task, install, grader=None, observer=None, observer_ns=None):
                     harbor_commit=task["harbor_commit"],
                     options=options,
                     context=context,
+                    prior_trajectory=prior_trajectory,
                 )
             ]
             if trajectory
@@ -312,6 +318,7 @@ def run(task, install, grader=None, observer=None, observer_ns=None):
             ),
             harbor_commit=task["harbor_commit"],
             harbor_trajectory=trajectory,
+            harbor_prior_trajectory=prior_trajectory,
             harbor_artifacts=artifacts,
             harbor_context=context,
             harbor_options=options,

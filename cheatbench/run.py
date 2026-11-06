@@ -34,6 +34,8 @@ from core import task_service              # noqa: E402
 from core import task_build                # noqa: E402
 from core import sandbox, trial            # noqa: E402
 from core.self_report import load_answers as load_self_reports  # noqa: E402
+from core.self_report import load_episodes as load_self_report_episodes  # noqa: E402
+from core.self_report import render as render_self_report  # noqa: E402
 from core.agents import AgentFactory, make_agent  # noqa: E402
 from core.agents import config as agent_config  # noqa: E402
 from core.agents import errors as agent_errors    # noqa: E402
@@ -49,6 +51,7 @@ MODELS_CONFIG = ROOT / "configs" / "models.yaml"
 OUTPUTS = ROOT / "outputs"
 SELF_REPORT_PROMPT = ROOT / "prompts" / "self_report.md"
 SELF_REPORT_CONDITIONED_PROMPT = ROOT / "prompts" / "self_report_conditioned.md"
+SELF_REPORT_IN_CONTEXT_PROMPT = ROOT / "prompts" / "self_report_in_context.md"
 
 # Compatibility fallback for archived configs without a model harness.
 DEFAULT_AGENT = "claude-sdk"
@@ -266,6 +269,15 @@ async def main_async(args: argparse.Namespace) -> int:
         prior_answers = load_self_reports(
             Path(args.output_dir) / f"{run_name}_{args.model}_{args.self_report_from}")
         args.prompt_wrapper = str(SELF_REPORT_CONDITIONED_PROMPT.relative_to(ROOT))
+    # The same answers, put in the model's own earlier turn instead: each row's
+    # self-report episode is rebuilt as [its user prompt, the answer JSON] and
+    # the attempt continues that conversation (docs/self_report_in_context.md).
+    prior_episodes = {}
+    if args.self_report_in_context_from:
+        sr_dir = Path(args.output_dir) / f"{run_name}_{args.model}_{args.self_report_in_context_from}"
+        prior_answers = load_self_reports(sr_dir)
+        prior_episodes = load_self_report_episodes(sr_dir)
+        args.prompt_wrapper = str(SELF_REPORT_IN_CONTEXT_PROMPT.relative_to(ROOT))
     # Replicates are just more work items: they queue through --max-concurrent
     # like anything else.
     todo = [(r, k) for r in rows for k in range(1, args.repeat + 1)
@@ -414,6 +426,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "honeypot": args.honeypot or None,
         "prompt_wrapper": args.prompt_wrapper or None,
         "self_report_from": args.self_report_from or None,
+        "self_report_in_context_from": args.self_report_in_context_from or None,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -503,7 +516,11 @@ async def main_async(args: argparse.Namespace) -> int:
                         backend=args.sandbox,
                         self_report=SELF_REPORT_PROMPT if args.self_report else None,
                         prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None,
-                        prior_self_report=prior_answers[row["id"]] if args.self_report_from else None)
+                        prior_self_report=prior_answers[row["id"]] if prior_answers else None,
+                        resume=agent.resume_state(
+                            *prior_episodes[row["id"]],
+                            reply=render_self_report(prior_answers[row["id"]]))
+                        if prior_episodes else None)
             except Exception as e:  # noqa: BLE001
                 rec = {"id": row["id"],
                        "episode": trial.episode_id(row["id"], replicate),
@@ -731,6 +748,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="condition the attempt on the same model's answer in "
                          "the --self-report run RUN_ID (e.g. selfreport1), "
                          "via prompts/self_report_conditioned.md")
+    ap.add_argument("--self-report-in-context-from", default="", metavar="RUN_ID",
+                    help="like --self-report-from, but the answer is the model's "
+                         "own earlier turn: the attempt continues the history "
+                         "[self-report prompt, answer JSON] rebuilt from that "
+                         "run, with prompts/self_report_in_context.md as its next "
+                         "user turn (codex, gemini-cli and terminus-2 only)")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "

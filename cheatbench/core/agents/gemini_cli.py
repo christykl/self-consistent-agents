@@ -334,6 +334,23 @@ class GeminiCLIAgent(InstalledAgent):
         return problems
 
     # ---- the episode ------------------------------------------------------
+    def resume_state(self, record: dict, transcript: dict, reply: str) -> dict:
+        """A Gemini CLI session to continue (`gemini --resume latest`), rebuilt
+        from an earlier self-report episode as [its user prompt, `reply`]: the
+        session records and the path the runner restores them under.
+
+        Kept from the episode: every record before the model's first message
+        (session header, the CLI's session context, the user prompt). Then its
+        last model message with text, with the text replaced by `reply` and
+        without `thoughts`, `toolCalls` or `tokens`. Dropped: every tool call,
+        tool response and other model message."""
+        records = transcript["messages"]
+        first = next(i for i, r in enumerate(records) if r.get("type") == "gemini")
+        final = [r for r in records if r.get("type") == "gemini" and r.get("content")][-1]
+        final = {k: v for k, v in final.items() if k not in ("thoughts", "tokens", "toolCalls")}
+        return {"session_path": record["session_path"],
+                "records": records[:first] + [dict(final, content=reply, thoughts=[])]}
+
     def blob(self, *, row: dict, prompt, files: list, skip_dirs: tuple,
              grader_src: str = "", stage_src: str, timeout_s: int,
              env: dict, install: dict | None = None,

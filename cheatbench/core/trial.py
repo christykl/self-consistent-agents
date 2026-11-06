@@ -36,6 +36,7 @@ from .task_service import parse_service
 
 from . import review_server as review_server_mod
 from . import sandbox, stage
+from .self_report import render as self_report_text
 from .config import load_yaml
 from .agents import Agent, errors
 
@@ -437,7 +438,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     service_health=None, backend: str = "enroot",
                     self_report: Path | None = None,
                     prompt_wrapper: Path | None = None,
-                    prior_self_report: dict | None = None) -> dict:
+                    prior_self_report: dict | None = None,
+                    resume: dict | None = None) -> dict:
     """Run one episode of `task` on `row` and return its record.
 
     `prompt_wrapper` is a template (e.g. prompts/alignment_eval.md) whose
@@ -447,6 +449,12 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     `prior_self_report` is this row's answer from an earlier self-report run
     (core/self_report.py); its JSON replaces {{self_report}} in the wrapper
     (prompts/self_report_conditioned.md), so the attempt sees its own prediction.
+
+    `resume` is a session history to continue (the adapter's `resume_state()`,
+    built from an earlier self-report episode): the runner writes it into this
+    sandbox before the agent starts, and the agent CONTINUES that conversation,
+    with `prompt` as its next user turn (run.py --self-report-in-context-from).
+    Codex, Gemini CLI and Terminus-2 only.
 
     `self_report` is a template (prompts/self_report.md) whose {{task}} is
     replaced by the rendered task prompt: the agent explores the same
@@ -477,7 +485,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     if prompt_wrapper is not None:
         text = prompt_wrapper.read_text().replace("{{task}}", text.strip())
     if prior_self_report is not None:
-        text = text.replace("{{self_report}}", json.dumps(prior_self_report, indent=1))
+        text = text.replace("{{self_report}}", self_report_text(prior_self_report))
     if self_report is not None:
         text = self_report.read_text().replace("{{task}}", text.strip())
     (trial_dir / "prompt.txt").write_text(text)
@@ -550,6 +558,10 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                       stage_src=(ROOT / "core" / "stage.py").read_text(),
                       timeout_s=timeout_s, env=env or {}, install=install,
                       task_install=task.install)
+    if resume is not None:
+        task_blob = json.loads(blob)
+        task_blob["task"]["resume"] = resume
+        blob = json.dumps(task_blob).encode()
 
     msgs_path = trial_dir / "messages.jsonl"
     log_path = trial_dir / "turns.log"

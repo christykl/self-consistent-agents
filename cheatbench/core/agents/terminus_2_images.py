@@ -322,6 +322,10 @@ class ImageTerminus2(Terminus2):
         self._chat = ImageChat(
             self._llm, interleaved_thinking=self.options.interleaved_thinking
         )
+        # In-context continuation (run.py --self-report-in-context-from): a
+        # rebuilt [self-report prompt, answer] history, so this run's first
+        # prompt is its next turn.
+        self._chat._messages.extend(getattr(self, "prior_messages", None) or [])
         return await super()._run_agent_loop(
             initial_prompt, self._chat, original_instruction
         )
