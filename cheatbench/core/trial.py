@@ -49,8 +49,10 @@ MSG_PREFIX = "\x1eRHMSG "
 
 # Grace on top of the episode's own asyncio timeout: the container enforces
 # timeout_s itself and still owes us a JSON line afterwards, so the host kill
-# switch must fire strictly later.
-CONTAINER_GRACE_S = 180
+# switch must fire strictly later. The grace also has to cover sending the whole
+# transcript: Modal's exec stream carried about 0.3 MB/s, and a knowledge_work
+# session with screenshots runs past 100 MB, which did not fit in the old 180 s.
+CONTAINER_GRACE_S = 900
 # Extra Modal sandbox lifetime beyond the host kill switch (see start_episode call).
 MODAL_SANDBOX_SLACK_S = 900
 
