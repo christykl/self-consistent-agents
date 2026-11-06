@@ -321,7 +321,8 @@ def test_every_transient_failure_is_also_a_lost_one() -> None:
     for tag in errors.TRANSIENT_REASONS:
         assert errors.is_lost(tag) is True, tag
     assert errors.LOST_REASONS - errors.TRANSIENT_REASONS == {
-        "usage_limit", "grader_unreachable", "reviewer_infrastructure", "batch_cancelled", "request_too_large", "invalid_api_input"}
+        "usage_limit", "grader_unreachable", "reviewer_infrastructure", "batch_cancelled", "request_too_large", "invalid_api_input",
+        "setup_hook", "container_launch"}
     assert errors.is_lost(None) is False
     assert errors.is_lost("no_such_tag") is False
 

@@ -263,15 +263,17 @@ class HarnessError(AgentError):
 
 
 class ContainerLaunchError(HarnessError):
-    """`enroot start` never started."""
+    """The container (or, on Modal, the service sandbox) never started: no agent ran."""
 
     reason = "container_launch"
+    lost_episode = True
 
 
 class SetupHookError(HarnessError):
     """The task's setup hook failed, so the episode never had its environment."""
 
     reason = "setup_hook"
+    lost_episode = True
 
 
 class AgentInstallError(HarnessError):
