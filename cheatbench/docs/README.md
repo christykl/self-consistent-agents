@@ -11,7 +11,7 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   the model's own earlier turn, and the attempt continues that conversation (Codex,
   Gemini CLI, Terminus-2).
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
-  models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage, and caveats.
+  models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage (including chess, Go and software engineering), what was verified, and caveats.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
   Vertex AI (GCP credits), with 1-hour service-account tokens refreshed into
   the Modal sandbox (`--model gemini-4-argon-vertex`).
