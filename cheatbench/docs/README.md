@@ -55,7 +55,8 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [report_eval_awareness.md](report_eval_awareness.md): why Gemini 4 Argon cheats
   far less than GPT-5 / Sol at baseline (90 rows). Honeypot exposure is similar; Gemini
   voices test/honeypot suspicion in 68/90 episodes and cheats in none of them.
-  Script: `scripts/eval_awareness.py`.
+  Qwen3.8-27B (all five settings) voices suspicion as often (67/90 at baseline) and
+  cheats in all 67. Script: `scripts/eval_awareness.py`.
 - [report_qwen_five_settings.md](report_qwen_five_settings.md): Qwen3.8-27B (Terminus-2)
   in the five settings on the same 90 rows. Cheated 87 / 84 / 79 / 24 / 4 (baseline,
   honeypot, alignment prompt, self-report cond., extreme alignment prompt); self-reported "tempted" on
