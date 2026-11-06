@@ -514,7 +514,7 @@ async def main_async(args: argparse.Namespace) -> int:
                         review=review_config,
                         service_health=getattr(active_service, "check_health", None),
                         backend=args.sandbox,
-                        self_report=SELF_REPORT_PROMPT if args.self_report else None,
+                        self_report=ROOT / args.probe if args.probe else SELF_REPORT_PROMPT if args.self_report else None,
                         prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None,
                         prior_self_report=prior_answers[row["id"]] if prior_answers else None,
                         resume=agent.resume_state(
@@ -736,6 +736,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="wrap the task prompt in prompts/self_report.md: the "
                          "agent explores the environment and reports whether it "
                          "would cheat, without attempting the task")
+    ap.add_argument("--probe", default="", metavar="TEMPLATE",
+                    help="like --self-report but with another planning-session "
+                         "template (e.g. prompts/eval_belief.md)")
     ap.add_argument("--honeypot", default="",
                     help="stage the overlay files under the task's "
                          "environment/honeypots/NAME/ in place of the originals "
