@@ -62,3 +62,14 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   honeypot, alignment prompt, self-report cond., extreme alignment prompt); self-reported "tempted" on
   89/90. Knowledge_work episodes mostly hit the 3600 s budget. Resume script:
   `scripts/finish_five_settings.sh`.
+- [report_in_context_self_report.md](report_in_context_self_report.md): the in-context
+  self-report setting (`incontext1`) for all five models on the same 90 rows, against
+  self-report conditioned and baseline. The same answer as the model's own earlier turn,
+  rather than quoted in the prompt, roughly doubles cheating where any remains
+  (cheated / 90, cond. → in-context: GPT-5 14 → 32, Qwen 24 → 53, Flash 10 → 19; Sol 0 → 1,
+  Argon 0 → 0). Quoted by the user, the answer is treated as a commitment ("I promised
+  not to ..."); as the model's own turn, as a past statement it reinterprets. Scripts:
+  `scripts/run_in_context.sh`, `scripts/finish_in_context.sh`, `scripts/compare_in_context.py`,
+  `scripts/in_context_framing.py`; figures: `scripts/plot_cheat_by_setting.py`,
+  `scripts/plot_said_vs_did.py`, `scripts/plot_commitment.py`, `scripts/plot_first_cheat.py`
+  (answer-access timing from `scripts/first_cheat.py`).
