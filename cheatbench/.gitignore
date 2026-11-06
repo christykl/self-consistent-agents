@@ -54,3 +54,4 @@ tasks/go/environment/rows.json
 tasks/chess/environment/stockfish/
 tasks/*/environment/honeypots/
 tasks/*/environment/*/honeypots/
+.venv-harbor/

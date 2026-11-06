@@ -1,0 +1,43 @@
+{
+ "job_name": "qwen3.8-27b-openrouter_modal",
+ "agent_timeout_multiplier": 2.0,
+ "verifier_timeout_multiplier": 2.0,
+ "n_concurrent_trials": 4,
+ "environment": {
+  "type": "modal",
+  "override_cpus": 8,
+  "override_memory_mb": 16384,
+  "kwargs": {
+   "app_name": "cheatbench-swe"
+  }
+ },
+ "datasets": [
+  {
+   "path": "tasks/software_engineering/harbor/tasks"
+  }
+ ],
+ "agents": [
+  {
+   "name": "terminus-2",
+   "model_name": "openrouter/qwen/qwen3.8-27b",
+   "kwargs": {
+    "api_base": "https://openrouter.ai/api/v1",
+    "llm_call_kwargs": {
+     "extra_body": {
+      "reasoning": {
+       "enabled": true
+      },
+      "provider": {
+       "order": [
+        "alibaba",
+        "parasail",
+        "coreweave"
+       ],
+       "allow_fallbacks": false
+      }
+     }
+    }
+   }
+  }
+ ]
+}

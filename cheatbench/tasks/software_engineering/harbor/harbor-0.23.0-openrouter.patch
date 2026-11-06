@@ -1,0 +1,16 @@
+--- a/harbor/agents/installed/codex.py
++++ b/harbor/agents/installed/codex.py
+@@ -1336,7 +1336,12 @@
+         if not self.model_name:
+             raise ValueError("Model name is required")
+ 
+-        model = self.model_name.split("/")[-1]
++        # OpenRouter routes on the provider prefix, so "openrouter/openai/x"
++        # must reach Codex as "openai/x".
++        if self.model_name.startswith("openrouter/"):
++            model = self.model_name.removeprefix("openrouter/")
++        else:
++            model = self.model_name.split("/")[-1]
+ 
+         # Build command with optional CLI config flags from descriptors.
+         cli_flags = self.build_cli_flags()

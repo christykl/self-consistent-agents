@@ -1,0 +1,32 @@
+{
+ "job_name": "gemini-3.8-flash-vertex_modal",
+ "agent_timeout_multiplier": 2.0,
+ "verifier_timeout_multiplier": 2.0,
+ "n_concurrent_trials": 4,
+ "environment": {
+  "type": "modal",
+  "override_cpus": 8,
+  "override_memory_mb": 16384,
+  "kwargs": {
+   "app_name": "cheatbench-swe"
+  }
+ },
+ "datasets": [
+  {
+   "path": "tasks/software_engineering/harbor/tasks"
+  }
+ ],
+ "agents": [
+  {
+   "import_path": "tasks.software_engineering.harbor.vertex_gemini:VertexGeminiAcp",
+   "model_name": "google/gemini-3.8-flash@default",
+   "kwargs": {
+    "registry_entry_path": "tasks/software_engineering/harbor/acp/gemini-3.8-flash-vertex.json"
+   },
+   "env": {
+    "GEMINI_API_KEY": "relay-holds-the-credential",
+    "GOOGLE_GEMINI_BASE_URL": "http://127.0.0.1:8765"
+   }
+  }
+ ]
+}

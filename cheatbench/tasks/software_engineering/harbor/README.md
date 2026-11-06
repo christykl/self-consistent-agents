@@ -50,6 +50,22 @@ Use `--n-concurrent 1` to run sequentially. Agent and verifier phases each have 
 6,000-second limit; image builds and installation take additional time.
 Output is saved under `jobs/<job_name>/`.
 
+## Run on Modal
+
+No local Docker needed. [setup_modal.sh](setup_modal.sh) builds `.venv-harbor`, and
+[run_modal.sh](run_modal.sh) runs a `configs/<model>_modal.json`, named after its
+`configs/models.yaml` entry, with output under `outputs/swe_jobs/`:
+
+```bash
+tasks/software_engineering/harbor/setup_modal.sh
+source .venv/bin/activate    # exports OPENROUTER_API_KEY
+tasks/software_engineering/harbor/run_modal.sh gpt-6-astra-openrouter
+```
+
+For the Gemini entries, also export `VERTEX_SERVICE_ACCOUNT` as in
+[gemini_vertex.md](../../../docs/gemini_vertex.md). See
+[modal_backend.md](../../../docs/modal_backend.md) for how each harness is routed.
+
 ## Judge
 
 Export a completed job, then follow the [behavioral judging instructions](../README.md#judge-behavior):
