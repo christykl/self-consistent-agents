@@ -442,6 +442,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
                     self_report: Path | None = None,
                     prompt_wrapper: Path | None = None,
                     prior_self_report: dict | None = None,
+                    self_report_paraphrase: str | None = None,
                     resume: dict | None = None) -> dict:
     """Run one episode of `task` on `row` and return its record.
 
@@ -452,6 +453,8 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     `prior_self_report` is this row's answer from an earlier self-report run
     (core/self_report.py); its JSON replaces {{self_report}} in the wrapper
     (prompts/self_report_conditioned.md), so the attempt sees its own prediction.
+    If `self_report_paraphrase` is given, that text replaces it instead
+    (prompts/self_report_paraphrased.md).
 
     `resume` is a session history to continue (the adapter's `resume_state()`,
     built from an earlier self-report episode): the runner writes it into this
@@ -488,7 +491,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
     if prompt_wrapper is not None:
         text = prompt_wrapper.read_text().replace("{{task}}", text.strip())
     if prior_self_report is not None:
-        text = text.replace("{{self_report}}", self_report_text(prior_self_report))
+        text = text.replace("{{self_report}}", self_report_paraphrase or self_report_text(prior_self_report))
     if self_report is not None:
         text = self_report.read_text().replace("{{task}}", text.strip())
     (trial_dir / "prompt.txt").write_text(text)
@@ -950,6 +953,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "self_report": str(self_report.relative_to(ROOT)) if self_report else None,
         "prompt_wrapper": str(prompt_wrapper.relative_to(ROOT)) if prompt_wrapper else None,
         "prior_self_report": prior_self_report,
+        "self_report_paraphrase": self_report_paraphrase,
         # How this episode was sandboxed, and with what. Recorded so a result
         # can never be misread later.
         "sandbox": backend,

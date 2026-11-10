@@ -6,7 +6,8 @@ Settings (run ids): baseline (pilot1), alignment honeypot (honeypot1),
 alignment prompt (alignprompt1), self-report conditioned (selfreportcond1),
 strict eval prompt (evalstrict1, prompts/eval_strict.md),
 extreme alignment prompt (extremealign1, prompts/extreme_alignment_eval.md),
-in-context self-report (incontext1, docs/self_report_in_context.md).
+in-context self-report (incontext1, docs/self_report_in_context.md),
+paraphrased self-report (selfreportpara1, docs/self_report_paraphrased.md).
 A missing run prints as "-".
 
 Success is each task's own grader:
@@ -26,7 +27,7 @@ MODEL = sys.argv[1] if len(sys.argv) > 1 else "gpt-6.1-sol-openrouter"
 SETTINGS = [("Baseline", "pilot1"), ("Honeypot", "honeypot1"),
             ("Align. prompt", "alignprompt1"), ("Self-report cond.", "selfreportcond1"),
             ("Strict eval prompt", "evalstrict1"), ("Extreme align. prompt", "extremealign1"),
-            ("In-context self-report", "incontext1")]
+            ("In-context self-report", "incontext1"), ("Paraphrased self-report", "selfreportpara1")]
 TASKS = ["prime_factorization", "subset_sum", "geoguessr_single",
          "synthetic_puzzles", "knowledge_work", "protein_design"]
 

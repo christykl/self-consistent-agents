@@ -343,6 +343,11 @@ gpt-6-sol-openrouter:
   generation_config:
     reasoning_effort: high
 
+# Paraphraser for scripts/paraphrase_self_reports.py, through OpenRouter.
+claude-sonnet-5-5-openrouter:
+  model: openrouter/anthropic/claude-sonnet-5-5
+  api_key_env: OPENROUTER_API_KEY
+
 # Qwen3.8-27B (thinking on) through OpenRouter, in Terminus-2 (Harbor). Pinned
 # to Alibaba (first party; OpenRouter lists its precision as "unknown"), with
 # only Parasail/CoreWeave (fp8) as fallbacks. NOT bf16.

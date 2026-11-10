@@ -52,6 +52,7 @@ OUTPUTS = ROOT / "outputs"
 SELF_REPORT_PROMPT = ROOT / "prompts" / "self_report.md"
 SELF_REPORT_CONDITIONED_PROMPT = ROOT / "prompts" / "self_report_conditioned.md"
 SELF_REPORT_IN_CONTEXT_PROMPT = ROOT / "prompts" / "self_report_in_context.md"
+SELF_REPORT_PARAPHRASED_PROMPT = ROOT / "prompts" / "self_report_paraphrased.md"
 
 # Compatibility fallback for archived configs without a model harness.
 DEFAULT_AGENT = "claude-sdk"
@@ -270,6 +271,14 @@ async def main_async(args: argparse.Namespace) -> int:
         prior_answers = load_self_reports(
             Path(args.output_dir) / f"{run_name}_{args.model}_{args.self_report_from}")
         args.prompt_wrapper = str(SELF_REPORT_CONDITIONED_PROMPT.relative_to(ROOT))
+    # The same answers, shown as the user's paraphrase instead of verbatim
+    # (scripts/paraphrase_self_reports.py, docs/self_report_paraphrased.md).
+    paraphrases = {}
+    if args.self_report_paraphrased_from:
+        sr_dir = Path(args.output_dir) / f"{run_name}_{args.model}_{args.self_report_paraphrased_from}"
+        prior_answers = load_self_reports(sr_dir)
+        paraphrases = json.loads((sr_dir / "paraphrases.json").read_text())["paraphrases"]
+        args.prompt_wrapper = str(SELF_REPORT_PARAPHRASED_PROMPT.relative_to(ROOT))
     # The same answers, put in the model's own earlier turn instead: each row's
     # self-report episode is rebuilt as [its user prompt, the answer JSON] and
     # the attempt continues that conversation (docs/self_report_in_context.md).
@@ -435,6 +444,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "prompt_wrapper": args.prompt_wrapper or None,
         "self_report_from": args.self_report_from or None,
         "self_report_in_context_from": args.self_report_in_context_from or None,
+        "self_report_paraphrased_from": args.self_report_paraphrased_from or None,
         # The agent CLI version. `requested` is the pin the operator asked for
         # after CLI/model selection; `agent_version` is what ran, filled in
         # from the first episode that reports one, because it is not knowable
@@ -525,6 +535,7 @@ async def main_async(args: argparse.Namespace) -> int:
                         self_report=ROOT / args.probe if args.probe else SELF_REPORT_PROMPT if args.self_report else None,
                         prompt_wrapper=ROOT / args.prompt_wrapper if args.prompt_wrapper else None,
                         prior_self_report=prior_answers[row["id"]] if prior_answers else None,
+                        self_report_paraphrase=paraphrases[row["id"]] if paraphrases else None,
                         resume=agent.resume_state(
                             *prior_episodes[row["id"]],
                             reply=render_self_report(prior_answers[row["id"]]))
@@ -765,6 +776,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "[self-report prompt, answer JSON] rebuilt from that "
                          "run, with prompts/self_report_in_context.md as its next "
                          "user turn (codex, gemini-cli and terminus-2 only)")
+    ap.add_argument("--self-report-paraphrased-from", default="", metavar="RUN_ID",
+                    help="like --self-report-from, but the prompt shows the user's "
+                         "paraphrase of the answer, from RUN_ID's paraphrases.json "
+                         "(scripts/paraphrase_self_reports.py), via "
+                         "prompts/self_report_paraphrased.md")
     ap.add_argument("--no-auto-retry", action="store_true",
                     help="do not re-run episodes that failed with a transient "
                          "gateway/transport fault (proxy 5xx, dropped stream, "

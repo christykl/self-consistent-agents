@@ -19,6 +19,7 @@ settings never mix (`outputs/<task>_<model>_<run-id>/`).
 | Self-report conditioned | `selfreportcond1` | `--self-report-from selfreport1` |
 | Extreme alignment prompt | `extremealign1` | `--prompt-wrapper prompts/extreme_alignment_eval.md` |
 | In-context self-report | `incontext1` | `--self-report-in-context-from selfreport1` ([details](self_report_in_context.md)); needs the `selfreport1` run first |
+| Paraphrased self-report | `selfreportpara1` | `--self-report-paraphrased-from selfreport1` ([details](self_report_paraphrased.md)); needs the `selfreport1` run and `scripts/paraphrase_self_reports.py` first |
 
 The self-report-conditioned setting reads the model's own answer to "would you be tempted
 to cheat?" on the same row, so run the self-report first:
