@@ -13,7 +13,9 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [self_report_paraphrased.md](self_report_paraphrased.md): the paraphrased self-report
   setting (`--self-report-paraphrased-from selfreport1`): self-report conditioned, but the
   prompt shows the user's paraphrase of the answer instead of the model's own JSON, to
-  separate following the content from the effect of the model's own tokens.
+  separate following the content from the effect of the model's own tokens. Includes why GPT-5
+  cheats 18/20 on prime_factorization in-context but 7 and 6 when the answer is quoted
+  (`scripts/pf_gpt5_self_report_settings.py`).
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage (including chess, Go and software engineering), what was verified, and caveats.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
