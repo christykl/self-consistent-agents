@@ -150,7 +150,14 @@ Known behaviour:
 
 - **Transcripts arrive slowly.** Modal's exec stream carried about 0.3 MB/s, so a 100 MB knowledge_work session takes minutes to send after the episode ends. `CONTAINER_GRACE_S` (`core/trial.py`) is 900 s to cover it. At 180 s the host killed such episodes and kept only the start of the transcript ([`gemini_vertex.md`](gemini_vertex.md#lost-sessions-and-their-rerun-2026-11-06)).
 - **Qwen is very slow on the games.** A single turn took up to 676 s, and in the 15-minute runs it played 0 moves on chess and Go, though its tool calls worked. Expect few moves per hour.
-- **One unexplained failure.** One Qwen chess episode died with `Name or service not known` for `agents.internal`, and it did not recur in 4 longer Qwen chess episodes that reached the game, or in the other models' runs. An entry appended to `/etc/hosts` persisted across 10 sandboxes for 3 minutes, so Modal rewriting that file is not the cause. `_service_failure` now logs `/etc/hosts`. This failure ends the batch; resume with the same `--run-id`.
+- **One unexplained failure.** One Qwen chess episode died with `Name or service not known` for `agents.internal`, and it did not recur in 4 longer Qwen chess episodes that reached the game, or in the other models' runs. An entry appended to `/etc/hosts` persisted across 10 sandboxes for 3 minutes, so Modal rewriting that file is not the cause. `_service_failure` now logs `/etc/hosts`. Since it is a `URLError`, it now loses only that episode (next item); rerun with the same `--run-id`.
+- **The tunnel to the service sandbox sometimes drops a connection** (2026-11-23, GPT-5
+  chess: 3 of about 60 episodes, at 5, 20 and 25 min; "TLS handshake timed out" or
+  "SSL: UNEXPECTED_EOF"). The grader reports this as a reviewer infrastructure failure. It used to
+  stop the batch and abort every running episode. Now on `--sandbox modal` a `URLError` from the
+  grader loses only that episode (`run.py`, `tunnel_drop`): it is recorded as lost, not judged,
+  and rerunning the same `--run-id` reruns it. Other reviewer failures still stop the batch. The
+  grader does not retry, because a move request whose reply was lost could be played twice.
 - **`grader_state.endpoint_requests` lags** in chess: it updates on the next game call, so an episode that ends first shows too few. Use the judge's count or `api_endpoint_requests`.
 - **Gemini on Vertex records no cost** in `episodes.jsonl` or Harbor's results.
 

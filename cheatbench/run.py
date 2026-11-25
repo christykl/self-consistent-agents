@@ -634,7 +634,12 @@ async def main_async(args: argparse.Namespace) -> int:
                         f"judged {counters['judged']} | ${counters['cost']:.2f}")
                     bar.update(1)
 
-            if rec.get("failure") in {"reviewer_infrastructure", "grader_unreachable"}:
+            # On Modal the agent reaches the chess/Go service through a Modal tunnel, which now and
+            # then drops one connection mid-episode (a URLError in the grader). That loses only this
+            # episode: it is recorded as lost, is not judged, and rerunning the same --run-id
+            # reruns it. Any other reviewer failure still stops the batch.
+            tunnel_drop = args.sandbox == "modal" and "URLError" in str(rec.get("error"))
+            if rec.get("failure") in {"reviewer_infrastructure", "grader_unreachable"} and not tunnel_drop:
                 stop_batch.set()
                 raise agent_errors.ReviewerInfrastructureError(
                     f"{rec['episode']}: {rec.get('error')}. "
