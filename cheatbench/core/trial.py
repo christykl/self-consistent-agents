@@ -1002,6 +1002,7 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         # was read back from), named by the adapter so `core/` still knows
         # nothing about any particular one.
         **{k: traj.get(k) for k in agent.EXTRA_RECORD_KEYS},
+        **throttling(traj),
         "error": error,
         # The same failure as a stable tag: "context_window_exceeded",
         # "safety_refusal", "timeout", ... None on a successful episode, which
@@ -1009,6 +1010,32 @@ async def run_trial(task: Task, row: dict, agent: Agent, *, image: str,
         "failure": errors.reason(failure),
         "ok": error is None,
     }
+
+
+def throttling(traj: dict) -> dict:
+    """How much the provider rate-limited this episode, from the forwarder's call log.
+
+    throttled_calls   requests answered 429.
+    throttle_wait_s   wall time from each 429 to the next request (the CLI's backoff),
+                      summed; needs per-call `t_start` (kimi-code records it).
+    Both are None when the episode ran without a forwarder: NOT MEASURED, which is
+    different from 0. A run whose episodes were throttled is not comparable to one
+    whose episodes were not (2026-11-24: Kimi on Fireworks, docs/kimi_fireworks.md).
+    """
+    calls = traj.get("forwarder_calls")
+    if calls is None:
+        return {"throttled_calls": None, "throttle_wait_s": None}
+    throttled = sum(1 for c in calls if c.get("status") == 429)
+    wait = None
+    if calls and all("t_start" in c for c in calls):
+        # Calls are logged as they COMPLETE; concurrent ones (subagents) interleave.
+        calls = sorted(calls, key=lambda c: c["t_start"])
+        wait = 0.0
+        for c, nxt in zip(calls, calls[1:] + [None]):
+            if c.get("status") == 429 and nxt is not None:
+                wait += nxt["t_start"] - c["t_start"]
+        wait = round(wait, 1)
+    return {"throttled_calls": throttled, "throttle_wait_s": wait}
 
 
 def classify_failure(agent: Agent, error: str | None,

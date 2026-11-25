@@ -457,7 +457,15 @@ class ModalServiceHost:
     def _watch(self) -> None:
         """A dead server must fail the episode; trial.py checks every 0.25 s, so the RPC lives here."""
         while not self._closing.wait(10):
-            code = self.server.poll()
+            # A sandbox that has shut down (seen once on a Go T4 service, cause
+            # unknown) makes poll() raise instead of returning a code, and its
+            # logs can no longer be read.
+            try:
+                code = self.server.poll()
+            except modal.exception.NotFoundError as e:
+                if not self._closing.is_set():
+                    self._dead = f"service sandbox shut down: {e}"
+                return
             if code is not None:
                 self._dead = f"service exited {code}: {self._log_tail()}"
                 return

@@ -97,6 +97,9 @@ def load_config(path: Path, model: str) -> dict:
         # (api_key_env) without touching the judge or grader -- see
         # core/agents/base.py.
         "base_url": entry.get("base_url"),
+        # Optional cap on concurrent episodes for THIS entry (its provider's rate
+        # limit, measured for that model on that provider; None = no cap).
+        "max_concurrent_episodes": entry.get("max_concurrent_episodes"),
         # Per-model API routing (core/routing.py): `api_key_env` is the HOST
         # variable NAME (None = the adapter's default, announced once);
         # `api_base_url` is interpolated here, so `${OPENAI_BASE_URL}` naming
@@ -225,6 +228,19 @@ async def main_async(args: argparse.Namespace) -> int:
     if not args.model:
         raise SystemExit("--model is required")
     cfg = load_config(models_config, args.model)
+    # A model entry may cap concurrency at what its provider's rate limits allow
+    # (kimi-k3-fireworks: Fireworks serverless token limits). The cap is per
+    # model entry, so it says nothing about other models or providers, and it
+    # is the TOTAL across every run.py using this entry at once: this process
+    # can only clamp itself, so concurrent launches must split it.
+    cap = cfg.get("max_concurrent_episodes")
+    if cap and args.max_concurrent > cap:
+        print(f"--max-concurrent {args.max_concurrent} -> {cap}: the {args.model} entry's "
+              f"max_concurrent_episodes (shared by ALL run.py processes on this model)", flush=True)
+        args.max_concurrent = cap
+    elif cap:
+        print(f"{args.model}: max_concurrent_episodes={cap} is shared by ALL run.py processes "
+              f"on this model; this one uses {args.max_concurrent}", flush=True)
     # Resolve the judge from the same model entries before starting episodes.
     args.judge = args.judge or judging.DEFAULT_JUDGE
     judge_cfg = judging.load_judge_config(models_config, args.judge)

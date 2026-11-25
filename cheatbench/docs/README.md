@@ -26,6 +26,9 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
   Vertex AI (GCP credits), with 1-hour service-account tokens refreshed into
   the Modal sandbox (`--model gemini-4-argon-vertex`).
+- [kimi_fireworks.md](kimi_fireworks.md): Kimi K3 in Kimi Code with calls
+  billed to our Fireworks account (`--model kimi-k3-fireworks`), and a
+  one-episode chess smoke on Modal.
 - [results_part1.md](results_part1.md): experimental results for Part 1 so far
   (pilot 1: GPT-6 Astra (Codex) and Qwen3.8-27B (Terminus-2), 14–15 episodes
   each across 6 tasks; the self-report "would you be tempted to cheat?"

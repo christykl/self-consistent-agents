@@ -223,6 +223,7 @@ def test_alternate_yaml_controls_route_model_effort_and_extra_body(tmp_path, mon
     cfg = run_py.load_config(path, "experiment")
     cfg.pop("harness", None)
     cfg.pop("harness_options", None)
+    cfg.pop("max_concurrent_episodes", None)  # run.py's own setting, not the agent's
     agent = make_agent("muse-code", max_turns=3, **cfg)
     agent.apply_tool_policy({"web_search": False, "web_fetch": False})
     assert agent.setup() == []

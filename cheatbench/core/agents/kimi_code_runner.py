@@ -609,7 +609,10 @@ class _KimiForwardHandler(BaseHTTPRequestHandler):
         call = {"type": "forwarder.call", "index": None, "method": self.command,
                 "path": self.path, "status": None, "request_model": None,
                 "stream": None, "bytes_in": len(body or b""), "bytes_out": 0,
-                "seconds": None}
+                "seconds": None,
+                # Wall-clock start, so the record can measure the time lost
+                # between a 429 and the CLI's next attempt (core/trial.py).
+                "t_start": round(t0, 3)}
         if body:
             try:
                 req = json.loads(body)
@@ -770,13 +773,17 @@ class KimiForwarder(ThreadingMixIn, HTTPServer):
         except Exception:  # noqa: BLE001
             pass
 
-    def probe(self, model: str, path: str = "/v1/chat/completions") -> dict:
+    def probe(self, model: str) -> dict:
         """ONE non-streaming request, to read the `provider` the pin resolved to.
 
         Sent through the same `Upstream` as everything else, so the body gets
         the same extra_body merge and the same key. No temperature, no token
-        cap, nothing but the model and one short user message.
+        cap, nothing but the model and one short user message. The path is the
+        one the CLI itself posts to (`base_url` + /chat/completions), so an
+        upstream with its own prefix (Fireworks: /inference/v1) is probed there.
         """
+        prefix = self.upstream.path.rstrip("/")
+        path = (prefix if prefix.endswith("/v1") else prefix + "/v1") + "/chat/completions"
         body = json.dumps({"model": model,
                            "messages": [{"role": "user", "content": PROBE_PROMPT}]}
                           ).encode()
@@ -1025,6 +1032,12 @@ def summarise(events: list, stream_json: list) -> dict:
             out["thinking_effort"] = ev.get("thinkingEffort")
             out["disallowed_tools"] = ev.get("disallowedTools")
             continue
+        if etype == "llm.request" and ev.get("thinkingEffort"):
+            # profile.bind logs the profile's default ("on") before the
+            # KIMI_MODEL_THINKING_EFFORT override applies; each request carries
+            # the effort actually sent (measured on 0.43.0: bind "on", all 83
+            # requests "high").
+            out["thinking_effort"] = ev["thinkingEffort"]
         if etype == "llm.tools_snapshot":
             # The tools ACTUALLY SENT to the model on the first request -- the
             # profile's `activeToolNames` is the allow-list BEFORE the

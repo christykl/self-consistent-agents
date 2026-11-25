@@ -191,6 +191,26 @@ kimi-k3:
     name: kimi-code
     version: 0.43.0
 
+# Kimi K3 through Fireworks serverless (our own Fireworks account), in Kimi
+# Code. No `extra_body`: the provider pin above is OpenRouter's. Fireworks
+# validates Kimi Code's `thinking: {type: enabled, effort: ...}` field (a bad
+# value is a 400), so the effort setting reaches the model.
+kimi-k3-fireworks:
+  model: accounts/fireworks/models/kimi-k3
+  # Fireworks serverless rate-limits by TOKENS per minute (adaptive, shared
+  # account). 2026-11-24: 34 chess+go episodes ran 15 min with no 429s; adding
+  # 40 prime_factorization episodes (~70 total) drew 429s on 39% of requests.
+  # This cap is for THIS entry only (Kimi K3 on Fireworks) and is the total
+  # across all run.py processes using it; run.py clamps --max-concurrent to it.
+  max_concurrent_episodes: 30
+  api_key_env: FIREWORKS_API_KEY
+  api_base_url: https://api.fireworks.ai/inference/v1
+  generation_config:
+    reasoning_effort: high
+  harness:
+    name: kimi-code
+    version: 0.43.0
+
 deepseek-v4-pro-litellm:
   model: openrouter/deepseek/deepseek-v4-pro
   api_key_env: LITELLM_API_KEY
