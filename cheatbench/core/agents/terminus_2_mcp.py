@@ -137,8 +137,21 @@ Available tools:
             data=data,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
-        with urllib.request.urlopen(request, timeout=60) as response:
-            result = json.load(response)
+        # The timeout sits above the grader's own (chess/go: 120 s per api_request,
+        # 900 s per harness call), as Codex's tool_timeout_sec = 900 does, so a
+        # grader call that hangs (e.g. on the Modal tunnel to the service sandbox)
+        # comes back from the grader as a tool error or an invalid episode. It was 60 s
+        # (upstream); on 2026-11-25 two Qwen chess episodes (PNMjr, FBLBF) ended at
+        # ~22 min when an api_request to agents.internal hung past it.
+        # urlopen's timeout raises the builtin TimeoutError, which the bridge would
+        # record as the episode's `timeout_s` budget running out (an agent result,
+        # never rerun); name it as the infra failure it is instead (errors.py
+        # classifies "request timed out" as a network error).
+        try:
+            with urllib.request.urlopen(request, timeout=960) as response:
+                result = json.load(response)
+        except TimeoutError as exc:
+            raise RuntimeError(f"MCP request timed out after 960s ({method}): {exc}") from exc
         if "error" in result:
             raise RuntimeError(str(result["error"]))
         return result["result"]

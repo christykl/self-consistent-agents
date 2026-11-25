@@ -29,6 +29,10 @@ Project documentation for the self-consistent-agents work on CheatBench (see
 - [kimi_fireworks.md](kimi_fireworks.md): Kimi K3 in Kimi Code with calls
   billed to our Fireworks account (`--model kimi-k3-fireworks`), and a
   one-episode chess smoke on Modal.
+- [qwen_chess_go.md](qwen_chess_go.md): Qwen3.8-27B (Terminus-2, OpenRouter; Fireworks
+  serves it only as a dedicated deployment) on all chess and Go rows: 0 x 429, chess 9/30
+  and Go 15/20 cheated, Go's 9 wins all in cheated episodes. Also the Terminus-2 MCP
+  timeout fix (60 s -> 960 s) and the 3 infra failures (rerun).
 - [results_part1.md](results_part1.md): experimental results for Part 1 so far
   (pilot 1: GPT-6 Astra (Codex) and Qwen3.8-27B (Terminus-2), 14–15 episodes
   each across 6 tasks; the self-report "would you be tempted to cheat?"
