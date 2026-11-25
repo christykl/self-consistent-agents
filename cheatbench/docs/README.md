@@ -90,7 +90,8 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   `scripts/run_in_context.sh`, `scripts/finish_in_context.sh`, `scripts/compare_in_context.py`,
   `scripts/in_context_framing.py`; figures: `scripts/plot_cheat_by_setting.py`,
   `scripts/plot_said_vs_did.py`, `scripts/plot_commitment.py`, `scripts/plot_first_cheat.py`
-  (answer-access timing from `scripts/first_cheat.py`), `scripts/plot_pf_success.py`
+  (answer-access timing from `scripts/first_cheat.py`), `scripts/honeypot_discovery.py` (chess/Go:
+  which episodes opened the opponent files and queried the advice endpoint), `scripts/plot_pf_success.py`
   (prime_factorization total and honest successes by setting), `scripts/plot_pf_cheat.py`
   (prime_factorization cheating by setting; both include Kimi K3), `scripts/plot_chess_go.py`
   (chess and Go cheating and wins by setting for GPT-5, GPT-6.1 Sol, Kimi K3 and Qwen;
