@@ -64,6 +64,7 @@ which puts it in the runner's task payload; the runner restores it and continues
 |---|---|---|
 | Codex (`codex.py`, `codex_runner.py`) | rollout events before the model's first output (session header, developer/environment context, the user prompt), then the episode's last assistant message and `task_complete` event with their text replaced by `reply` | rollout written to the episode's path under `$CODEX_HOME/sessions`, then `codex exec resume ... -- <session id> <prompt>` |
 | Gemini CLI (`gemini_cli.py`, `gemini_cli_runner.py`) | session records before the first model message (header, the CLI's session context, the user prompt), then the episode's last model message with its text replaced by `reply` and no `thoughts`, `toolCalls` or `tokens` | session file written to the episode's `~/.gemini/tmp/.../chats/` path, then `gemini --resume latest --prompt=<prompt>` |
+| Kimi Code (`kimi_code.py`, `kimi_code_runner.py`) | wire.jsonl records before the model's first step (session header, profile with the system prompt, MCP tool list, the user prompt, the CLI's date and auto-mode reminders), minus UI events, then one synthetic step whose only content is `reply` as text and the turn's end; plus a `state.json` naming the session | both written to the episode's session path under `$KIMI_CODE_HOME/sessions`, then `kimi --session <id> --prompt <prompt>` (the CLI rebuilds its context from wire.jsonl alone) |
 | Terminus-2 (`terminus_2.py`, `terminus_2_bridge.py`, `terminus_2_images.py`) | chat `[user: the episode's first trajectory step (Harbor's first chat message, verbatim), assistant: reply]`; Harbor's chat never holds reasoning here (`interleaved_thinking` is off) | prepended to the new run's chat; the matching two steps are prepended to the new trajectory (`terminus_2.py to_trajectory`) |
 
 Codex and Gemini CLI can only take a prior history by resuming a session file, hence
@@ -77,7 +78,9 @@ The restored context comes from the `selfreport1` run, so its incidental details
 are that run's (e.g. Codex's `<current_date>`, Gemini's directory listing taken when
 that sandbox started). On resume, Codex also inserts a fresh `<environment_context>`
 (the attempt's date and workspace listing) before the new prompt, so a Codex attempt
-sees two dates: the `selfreport1` one and the attempt's. Gemini CLI and Terminus-2
+sees two dates: the `selfreport1` one and the attempt's. Kimi Code re-adds its
+auto-mode reminder after the new prompt, and a date-change reminder when the
+attempt's (UTC) date differs from the `selfreport1` one. Gemini CLI and Terminus-2
 add nothing similar.
 
 ## Run

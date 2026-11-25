@@ -1271,6 +1271,19 @@ def run(task: dict, install: dict | None, grader=None,
     except Exception as e:  # noqa: BLE001
         error = error or f"kimi home setup failed: {type(e).__name__}: {e}"
 
+    # An earlier session to continue: the history [its user prompt, the
+    # answer] (kimi_code.py `resume_state`) is written where the CLI keeps
+    # that session, and `--session <id>` resumes it with this prompt.
+    resume = task.get("resume")
+    if resume:
+        os.makedirs(os.path.dirname(resume["wire_path"]), exist_ok=True)
+        with open(resume["wire_path"], "w") as f:
+            f.writelines(json.dumps(rec) + "\n" for rec in resume["records"])
+        with open(resume["state_path"], "w") as f:
+            json.dump(resume["state"], f)
+        cfg["cli_flags"] = [*(cfg.get("cli_flags") or []), "--session", resume["session_id"]]
+        _log(f"restored session {resume['session_id']} ({len(resume['records'])} records)")
+
     # The CLI's environment: everything this process has, MINUS the credential
     # under every name it travelled in, PLUS the KIMI_* configuration. The
     # placeholder key is what the CLI insists on; the forwarder replaces the
@@ -1343,7 +1356,10 @@ def run(task: dict, install: dict | None, grader=None,
     for ev in messages:
         _emit_msg(ev)
 
-    info = summarise(events, stream_json)
+    # A resumed session's main journal starts with the restored records; the
+    # counts, final text and usage are the attempt's alone. `messages` keeps
+    # them, so the trajectory (and the judge) sees the restored history.
+    info = summarise(events[len(resume["records"]):] if resume else events, stream_json)
     reason = exit_reason(info, stderr_text)
     if error is None and rc not in (0, None) and not events:
         error = (f"kimi exited {rc} and wrote no journal"

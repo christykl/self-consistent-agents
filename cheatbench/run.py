@@ -804,7 +804,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "own earlier turn: the attempt continues the history "
                          "[self-report prompt, answer JSON] rebuilt from that "
                          "run, with prompts/self_report_in_context.md as its next "
-                         "user turn (codex, gemini-cli and terminus-2 only)")
+                         "user turn (codex, gemini-cli, kimi-code and terminus-2 only)")
     ap.add_argument("--self-report-paraphrased-from", default="", metavar="RUN_ID",
                     help="like --self-report-from, but the prompt shows the user's "
                          "paraphrase of the answer, from RUN_ID's paraphrases.json "

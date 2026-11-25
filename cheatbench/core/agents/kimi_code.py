@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -412,6 +413,54 @@ class KimiCodeAgent(InstalledAgent):
         return out
 
     # ---- the episode ------------------------------------------------------
+    def resume_state(self, record: dict, transcript: dict, reply: str) -> dict:
+        """A Kimi Code session to continue (`kimi --session <id> --prompt ...`),
+        rebuilt from an earlier self-report episode as [its user prompt,
+        `reply`]: the session's wire.jsonl records, its state.json, and the
+        paths and session id the runner restores them under.
+
+        Kept from the episode: every journal record before the model's first
+        step (session header, profile with the system prompt, MCP tool list,
+        the user prompt and the CLI's date and auto-mode reminders), minus UI
+        events (`kind: event`). Then one synthetic step whose only content is
+        `reply` as text, and the turn's end. Dropped: reasoning, tool calls and
+        their results, other assistant text, usage and request records.
+
+        The CLI rebuilds its context from wire.jsonl alone: measured on 0.43.0
+        with a session whose answer was replaced, `--session` resumed it in a
+        fresh home holding only this file and state.json, and the model quoted
+        the replaced answer back."""
+        events = transcript["messages"]
+        first = next(i for i, ev in enumerate(events)
+                     if ev.get("type") == "context.append_loop_event")
+        prompt = [ev for ev in events[:first] if ev.get("kind") != "event"]
+        turn = next(ev["turnId"] for ev in prompt if ev.get("type") == "turn.prompt")
+        step = str(uuid.uuid4())
+        answer = [
+            {"type": "context.append_loop_event", "agentId": "main",
+             "event": {"type": "step.begin", "uuid": step, "turnId": str(turn), "step": 1}},
+            {"type": "context.append_loop_event", "agentId": "main",
+             "event": {"type": "content.part", "uuid": str(uuid.uuid4()), "turnId": str(turn),
+                       "step": 1, "stepUuid": step, "part": {"type": "text", "text": reply}}},
+            {"type": "context.append_loop_event", "agentId": "main",
+             "event": {"type": "step.end", "uuid": step, "turnId": str(turn), "step": 1,
+                       "finishReason": "end_turn"}},
+            {"type": "turn.ended", "agentId": "main", "turnId": turn, "reason": "completed"},
+        ]
+        # wire_paths[0] is the main agent's:
+        # <home>/sessions/<workspace>/<session>/agents/main/wire.jsonl
+        wire_path = record["wire_paths"][0]
+        session_dir = wire_path.rsplit("/agents/", 1)[0]
+        cwd = next(ev["environmentDisclosure"]["cwd"] for ev in prompt
+                   if ev.get("type") == "profile.bind")
+        state = {"id": record["session_id"], "version": 2, "cwd": cwd,
+                 "archived": False, "custom": {}, "isCustomTitle": False,
+                 "lastTurnReason": "completed",
+                 "agents": {"main": {"homedir": f"{session_dir}/agents/main", "type": "main"}}}
+        return {"session_id": record["session_id"], "wire_path": wire_path,
+                "state_path": f"{session_dir}/state.json", "state": state,
+                "records": prompt + answer}
+
     def blob(self, *, row: dict, prompt, files: list, skip_dirs: tuple,
              grader_src: str = "", stage_src: str, timeout_s: int,
              env: dict, install: dict | None = None,
