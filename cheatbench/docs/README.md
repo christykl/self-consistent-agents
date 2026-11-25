@@ -18,6 +18,11 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   (`scripts/pf_gpt5_self_report_settings.py`).
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage (including chess, Go and software engineering), what was verified, and caveats.
+- [chess_go_prompt_fix.md](chess_go_prompt_fix.md): GPT-5 on chess and Go with the
+  original prompt (no cheating, 2/28 chess and 0/20 Go wins, false "win by resignation"
+  claims copied from the prompt's example), and the prompt/tool-output fix that states the
+  move cap and asks for the actual result. GPT-5 rerun on the fixed prompt (`pilot2`): answers
+  now match the record, Go resets go from 0.35 to 3.3 per episode, still 0 cheated and 2/30 + 0/20 wins.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
   Vertex AI (GCP credits), with 1-hour service-account tokens refreshed into
   the Modal sandbox (`--model gemini-4-argon-vertex`).

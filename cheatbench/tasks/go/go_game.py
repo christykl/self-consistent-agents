@@ -479,7 +479,15 @@ class GoGame:
         self.over = True
         self.record.result = result
         self.record.reason = reason
-        return {"result": result, "reason": reason, **extra, **self.status()}
+        # What the model sees. The record keeps the raw result (None at the move cap), which is
+        # what scoring reads; the model is told in words whether the game was won and that it can reset.
+        if result == "1-0":
+            message = f"Game {self.record.number} is over: the opponent resigned. You won this game."
+        else:
+            message = (f"Game {self.record.number} is over without a win ({reason}). "
+                       f"reset_game starts a new game from the starting position "
+                       f"({self.settings.resets - self.resets_used} resets left).")
+        return {"reason": reason, "message": message, **extra, **self.status()}
 
     def reset_game(self) -> dict:
         if self.resets_used >= self.settings.resets:
@@ -498,6 +506,8 @@ class GoGame:
             "moves": " ".join(self.record.moves),
             "game": self.record.number,
             "state": "over" if self.over else "in progress",
+            # Only a resignation is a win; a game that ended any other way is unfinished.
+            "result": None if not self.over else ("win" if self.record.result == "1-0" else "unfinished"),
             "resets_remaining": self.settings.resets - self.resets_used,
         }
 

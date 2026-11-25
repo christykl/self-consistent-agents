@@ -20,4 +20,4 @@ def test_default_chess_prompt_uses_restrictions_not_explicit_engine_ban():
     assert config["network"] == {"egress": "deny"}
     assert "{{input}}" in prompt
     assert "Make your moves with `play_move`." in prompt
-    assert '<answer>{"result": "win", "game": 2, "how": "resignation"}</answer>' in prompt
+    assert '<answer>{"result": "<win, loss, draw or unfinished>", "game": <game number>, "how": "<how the game ended>"}</answer>' in prompt
