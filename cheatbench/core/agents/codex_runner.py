@@ -685,7 +685,13 @@ def compose_command(cfg: dict, instruction: str, logfile: str,
     reads a prompt from stdin when it is not given one, and a `codex exec` still
     waiting on a terminal is an episode that hangs to the timeout.
     """
-    parts = ["codex", "exec", *(["resume"] if resume_id else []), *cfg["exec_flags"],
+    flags = list(cfg["exec_flags"])
+    if resume_id and "--sandbox" in flags:
+        # `codex exec resume` (0.154.0) rejects `--sandbox` ("unexpected argument") and
+        # exits 2 before the turn starts; the same setting goes in as config instead.
+        i = flags.index("--sandbox")
+        flags[i:i + 2] = ["-c", f'sandbox_mode="{flags[i + 1]}"']
+    parts = ["codex", "exec", *(["resume"] if resume_id else []), *flags,
              "--model", cfg["model_slug"], "--json"]
     for feature in cfg.get("enable") or []:
         parts += ["--enable", feature]
@@ -1047,7 +1053,10 @@ def run(task: dict, install: dict | None, grader=None,
         # typed `failure`, and the resume gets to see it -- exactly as the kimi
         # runner already does with a non-`completed` terminal reason.
         error = f"codex ended the turn with an error: {info['terminal_error']}"
-    if error is None and rc not in (0, None) and not events:
+    # On a resume, the restored self-report events are in the rollout too; only this
+    # session's events show that the CLI actually ran (a rejected flag exits 2 with none).
+    new_events = events[len(resume["events"]):] if resume else events
+    if error is None and rc not in (0, None) and not new_events:
         error = f"codex exited {rc} and wrote no rollout"
 
     try:

@@ -122,3 +122,16 @@ Checks:
   min and its episodes often exceed the budget, and the same
   `timeout after 3780s (container killed)` (no records recovered) occurs in its
   pilot1, honeypot1, alignprompt1 and selfreportcond1 runs at the full 3600 s budget.
+
+## Codex `resume` on MCP-only tasks (chess, Go), fixed 2026-11-25
+
+On chess and Go, Codex's tools are restricted to the task's MCP server, so its flags include
+`--sandbox read-only`. `codex exec resume` (0.154.0) rejects that flag ("unexpected argument
+'--sandbox'") and exits 2 before the turn starts. The runner still recorded these episodes as
+`ok` with an empty answer, because the restored self-report events counted as a rollout. The
+first GPT-6.1 Sol Go `incontext1` batch (20 rows) was lost this way; it is kept in
+`outputs/go_gpt-6.1-sol-openrouter_incontext1_brokenresume/` and was rerun. The fix
+(`core/agents/codex_runner.py`): on `resume`, the sandbox setting goes in as
+`-c sandbox_mode="read-only"`, and a non-zero exit with no events from this session is an
+error. The other tasks pass `--dangerously-bypass-approvals-and-sandbox`, which `resume`
+accepts, so their in-context runs were unaffected.
