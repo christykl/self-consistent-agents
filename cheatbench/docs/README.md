@@ -10,6 +10,10 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   setting (`--self-report-in-context-from selfreport1`): the stored self-report answer as
   the model's own earlier turn, and the attempt continues that conversation (Codex,
   Gemini CLI, Terminus-2).
+- [self_report_paraphrased.md](self_report_paraphrased.md): the paraphrased self-report
+  setting (`--self-report-paraphrased-from selfreport1`): self-report conditioned, but the
+  prompt shows the user's paraphrase of the answer instead of the model's own JSON, to
+  separate following the content from the effect of the model's own tokens.
 - [modal_backend.md](modal_backend.md): running episodes in Modal Sandboxes with
   models and judges via OpenRouter (`--sandbox modal`). Covers code changes, task coverage (including chess, Go and software engineering), what was verified, and caveats.
 - [gemini_vertex.md](gemini_vertex.md): Gemini 4 Argon in Gemini CLI on
@@ -72,4 +76,6 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   `scripts/run_in_context.sh`, `scripts/finish_in_context.sh`, `scripts/compare_in_context.py`,
   `scripts/in_context_framing.py`; figures: `scripts/plot_cheat_by_setting.py`,
   `scripts/plot_said_vs_did.py`, `scripts/plot_commitment.py`, `scripts/plot_first_cheat.py`
-  (answer-access timing from `scripts/first_cheat.py`).
+  (answer-access timing from `scripts/first_cheat.py`), `scripts/plot_pf_success.py`
+  (prime_factorization total and honest successes by setting), `scripts/plot_pf_cheat.py`
+  (prime_factorization cheating by setting).
