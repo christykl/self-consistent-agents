@@ -377,6 +377,13 @@ ERROR_PATTERNS: list[ErrorPattern] = [
     # rather than our own spending cap, which is the difference between "the
     # model did something strange" and "top the key up and re-run".
     ErrorPattern(r"Budget has been exceeded", ApiUsageLimitError),
+    # OpenRouter out of credits: HTTP 402 with "Insufficient credits. Add more using
+    # https://openrouter.ai/settings/credits", or "This request requires more credits,
+    # or fewer max_tokens ..." when the balance can't cover max_tokens. Codex prints
+    # the status as "402 Payment Required". A key that reaches its own spending limit
+    # gets "Key limit exceeded" (HTTP 403) instead.
+    ErrorPattern(r"402 Payment Required|Insufficient credits|requires more credits|Key limit exceeded",
+                 ApiUsageLimitError),
     ErrorPattern(r"API Error: 500 Internal server error", ApiInternalServerError),
     ErrorPattern(r"RetriableError: \[internal\] Error", ApiInternalServerError),
     ErrorPattern(r"API Error: Overloaded", ApiOverloadedError),

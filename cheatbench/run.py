@@ -639,6 +639,14 @@ async def main_async(args: argparse.Namespace) -> int:
             # episode: it is recorded as lost, is not judged, and rerunning the same --run-id
             # reruns it. Any other reviewer failure still stops the batch.
             tunnel_drop = args.sandbox == "modal" and "URLError" in str(rec.get("error"))
+            # Out of API funds (e.g. OpenRouter 402): every later episode would fail the same
+            # way after paying for its sandboxes, so start no more. Episodes already running
+            # are cancelled; rerunning the same --run-id once the account is topped up resumes.
+            if rec.get("failure") == "usage_limit":
+                stop_batch.set()
+                raise agent_errors.ApiUsageLimitError(
+                    f"{rec['episode']}: {rec.get('error')}. Batch stopped: the API account is "
+                    f"out of funds. Top it up, then rerun the same command to resume.")
             if rec.get("failure") in {"reviewer_infrastructure", "grader_unreachable"} and not tunnel_drop:
                 stop_batch.set()
                 raise agent_errors.ReviewerInfrastructureError(

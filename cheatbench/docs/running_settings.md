@@ -65,6 +65,30 @@ existing run dir runs every row. To run a subset of tasks, copy the `run_task` l
 want. Judge verdicts are written automatically; `python judge.py OUTDIR --judge JUDGE`
 re-judges a run dir.
 
+### Chess and Go
+
+```bash
+python scripts/run_chess_go_settings.py MODEL   # needs MODEL's chess and go selfreport1 runs
+```
+
+Runs `alignprompt1`, `extremealign2`, `selfreportcond1` and `incontext1` on every chess and
+Go row: chess and Go in parallel, settings in sequence, so chess holds at most 30 episodes
+and Go at most 10 (each Go episode holds a T4, and Modal allows 10 GPUs). It waits for any
+running chess/go `run.py` of the same model to exit first. After a task's four settings, one
+rerun pass (`--only ... --redo`) repeats rows that failed for infrastructure reasons or have
+no record. A `timeout` or `max_turns` record is a result about the agent and is not
+rerun, with one exception: "timeout after 4500s (container killed)" (the host's backstop, not
+the runner's "timeout after 3600s") whose model calls stopped 10+ min before the budget ran
+out, or that made no model call at all, i.e. the container hung. A watchdog ends episodes whose agent-sandbox forwarder has died (Codex then logs
+only "Reconnecting... waiting for network"; about 1 in 30 episodes, cause unknown), so
+they're recorded as `container_exit` and rerun instead of being recorded as timeouts.
+
+Out of funds: OpenRouter's "Insufficient credits" (402) and "Key limit exceeded" (403) are
+classified as `usage_limit` (`core/agents/errors.py`). `run.py` stops its batch at the first
+`usage_limit` record and cancels the episodes still running (their sandboxes are closed),
+and the script then starts nothing else. After a top-up, rerun the same command: rows with
+an ok, `timeout` or `max_turns` record are skipped.
+
 ## A different model or harness
 
 - **Model:** add an entry to `configs/models.yaml` (model slug, `api_key_env`, `api_base_url`,
