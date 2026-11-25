@@ -81,3 +81,10 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   (answer-access timing from `scripts/first_cheat.py`), `scripts/plot_pf_success.py`
   (prime_factorization total and honest successes by setting), `scripts/plot_pf_cheat.py`
   (prime_factorization cheating by setting).
+- [report_self_report_leakage.md](report_self_report_leakage.md): how much of the drop in
+  cheating under self-report conditioning could be the self-report naming the honeypot
+  (information from its extra exploration). 157 of the 260-episode baseline → conditioned
+  drop is on rows whose self-report does not name the honeypot (all of GPT-5, Sol and
+  Argon). A task-stratified estimate puts the part leakage explains at about 9 episodes.
+  Also compares "names the honeypot" with "lists a cheating action". Script:
+  `scripts/self_report_leakage.py`.
