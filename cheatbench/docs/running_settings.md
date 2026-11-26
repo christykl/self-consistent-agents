@@ -72,11 +72,16 @@ python scripts/run_chess_go_settings.py MODEL   # needs MODEL's chess and go sel
 ```
 
 Runs `alignprompt1`, `extremealign2`, `selfreportcond1` and `incontext1` on every chess and
-Go row: chess and Go in parallel, settings in sequence, so chess holds at most 30 episodes
-and Go at most 10 (each Go episode holds a T4, and Modal allows 10 GPUs). It waits for any
-running chess/go `run.py` of the same model to exit first. After a task's four settings, one
-rerun pass (`--only ... --redo`) repeats rows that failed for infrastructure reasons or have
-no record. A `timeout` or `max_turns` record is a result about the agent and is not
+Go row. Each task has a pool of slots (chess 30, Go 10, since each Go episode holds a T4 and
+Modal allows 10 GPUs; `python scripts/run_chess_go_settings.py MODEL CHESS_N GO_N` lowers
+them, e.g. `kimi-k3-fireworks 21 9` to fit Kimi's 30-episode Fireworks cap). Every episode is
+its own `run.py --only ROW` process, and the four settings' rows are interleaved, so the
+settings run in parallel and a slot is reused as soon as its episode ends. (Until 2026-11-25
+the settings ran one after another as whole batches, which left most slots idle while each
+setting's last rows finished.) Episodes of the same model already running on these settings
+when the script starts keep their slots and are not started again. After a task's first
+pass (and those earlier runs) finish, one rerun pass repeats rows that failed for
+infrastructure reasons or have no record. A `timeout` or `max_turns` record is a result about the agent and is not
 rerun, with one exception: "timeout after 4500s (container killed)" (the host's backstop, not
 the runner's "timeout after 3600s") whose model calls stopped 10+ min before the budget ran
 out, or that made no model call at all, i.e. the container hung. A watchdog ends episodes whose agent-sandbox forwarder has died (Codex then logs

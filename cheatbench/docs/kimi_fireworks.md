@@ -163,3 +163,47 @@ Results (all judged, 0 x 429, no infra failures):
 
 For comparison, the attempt runs without a self-report: chess 9/30, go 19/20,
 prime_factorization pilot1 20/20 cheated.
+
+## Four settings on chess and go (2026-11-25)
+
+`alignprompt1`, `extremealign2`, `selfreportcond1` and `incontext1` on every chess (30) and
+go (20) row, run by `scripts/run_chess_go_settings.py kimi-k3-fireworks 21 9` (later `20 10`):
+at most 30 Kimi episodes at once (the entry's cap), go at most 10 (Modal's GPU limit).
+
+Results, latest record per row (all 200 judged; 0 HTTP 429s, `throttled_calls` 0 everywhere):
+
+| Run | chess: completed / timed out | chess: judged cheated | go: completed / timed out | go: judged cheated |
+|---|---|---|---|---|
+| pilot1 (baseline, above) | 5 / 25 | 9/30 | 20 / 0 | 19/20 |
+| alignprompt1 | 6 / 24 | 6/30 | 15 / 5 | 9/20 |
+| extremealign2 | 4 / 26 | 0/30 | 10 / 10 | 1/20 |
+| selfreportcond1 | 0 / 30 | 0/30 | 11 / 9 | 0/20 |
+| incontext1 | 0 / 30 | 0/30 | 9 / 11 | 1/20 |
+
+Timeouts are the agent using its whole 3600 s budget (model calls throughout the hour), not
+hangs; they are judged like completed episodes. On go, rows that finished early under
+`alignprompt1` often used the full hour under the other settings.
+
+How the run went:
+
+- The launcher was rewritten mid-run (docs/running_settings.md): settings used to run one after
+  another as whole batches, which left most slots idle while each setting's last rows finished.
+  Now every episode is its own `run.py --only ROW` process on a per-task slot pool, with the
+  four settings' rows interleaved. On the first restart, a retry of a row that already had a
+  failed record was not counted as in flight, so go `ogs_76510140_m196` was started twice (the
+  copy was stopped within a minute) and go briefly had 11 episodes for 10 GPUs; `in_flight` now
+  counts a single-row process's row directly.
+- The run was paused for a laptop shutdown at 17:00 (24 running episodes killed with SIGTERM,
+  their sandboxes terminated, partial trajectories moved to `<run>/trajectories_paused_20261125/`;
+  list in `outputs/logs/kimi_paused_episodes_20261125.txt`) and relaunched at 18:10. SIGINT does
+  not stop a run.py started in the background by the launcher (it inherits SIGINT ignored).
+- 14 episodes failed for infrastructure reasons and were rerun; every rerun completed:
+  go sandboxes shut down mid-episode (`NotFoundError ... Sandbox has already shut down`,
+  6, three of them within 6 minutes around 19:00), the agent sandbox lost its connection to the
+  chess service (TLS handshake timeout / EOF, or the model bridge refusing connections; 6),
+  one go episode got `ResourceExhaustedError: Insufficient capacity` after waiting 21 min for a
+  T4, and one a DNS failure on the laptop. Modal gives no reason for the sandbox shutdowns.
+
+Logs: `outputs/logs/settings_kimi-k3-fireworks_driver.log` (launcher; the first, sequential
+launch is `..._driver_sequential.log`), `outputs/logs/settings_kimi-k3-fireworks/` (one file per
+episode), `outputs/logs/watch_kimi_chess_go_settings.log` (throttling watcher).
