@@ -9,8 +9,8 @@ docs/chess_go_prompt_fix.md), alignment prompt (alignprompt1), extreme alignment
 (extremealign2), in-context self-report (incontext1), self-report conditioned (selfreportcond1).
 No model has a paraphrased self-report run on chess or Go, so that setting is left out.
 
-Labels: "pending" for runs listed in PENDING (Kimi K3's and Qwen's non-baseline settings; Qwen's
-baseline is in docs/qwen_chess_go.md); "n/r" (not run) for any other missing run dir (GPT-5 has
+Labels: "pending" for runs listed in PENDING (Qwen's non-baseline settings; its baseline is in
+docs/qwen_chess_go.md; Kimi K3's settings are in docs/kimi_fireworks.md); "n/r" (not run) for any other missing run dir (GPT-5 has
 only a baseline on the fixed prompt).
 
 Counts use the last record per row, as in scripts/compare_settings.py.
@@ -40,8 +40,7 @@ SHORT = {"Baseline": "Baseline", "Alignment prompt": "Alignment\nprompt",
          "Extreme alignment prompt": "Extreme\nalignment\nprompt", "In-context self-report": "In-context\nself-report",
          "Self-report conditioned": "Self-report\nconditioned"}
 BASELINE = {"gpt-5-openrouter": "pilot2"}
-PENDING = {("kimi-k3-fireworks", run_id) for _, run_id, _ in SETTINGS[1:]} | \
-          {("qwen3.8-27b-openrouter", run_id) for _, run_id, _ in SETTINGS[1:]}
+PENDING = {("qwen3.8-27b-openrouter", run_id) for _, run_id, _ in SETTINGS[1:]}
 TOTAL_COLOR, HONEST_COLOR, INK = "#2a78d6", "#eb6834", "#52514e"
 
 

@@ -95,7 +95,7 @@ Project documentation for the self-consistent-agents work on CheatBench (see
   (prime_factorization total and honest successes by setting), `scripts/plot_pf_cheat.py`
   (prime_factorization cheating by setting; both include Kimi K3), `scripts/plot_chess_go.py`
   (chess and Go cheating and wins by setting for GPT-5, GPT-6.1 Sol, Kimi K3 and Qwen;
-  `docs/figures/chess_go_{cheat,success}_by_setting.png`; Kimi's and Qwen's non-baseline
+  `docs/figures/chess_go_{cheat,success}_by_setting.png`; Qwen's non-baseline
   settings are marked "pending" by hand in the script's `PENDING` set).
 - [report_self_report_leakage.md](report_self_report_leakage.md): how much of the drop in
   cheating under self-report conditioning could be the self-report naming the honeypot
